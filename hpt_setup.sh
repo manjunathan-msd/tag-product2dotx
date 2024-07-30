@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# Navigate to the Reward Style directory
-cd "Reward Style" || exit
 
 # Clone the HPT repository
 git clone https://github.com/HyperGAI/HPT.git
