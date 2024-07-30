@@ -1,2 +1,4 @@
 dumps/
 temp.py
+*.pyc
+*/__pycache__
