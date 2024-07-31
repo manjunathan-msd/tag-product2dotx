@@ -1,4 +1,5 @@
 # Import libraries
+from typing import Any
 import pandas as pd
 
 
@@ -50,7 +51,12 @@ class TaxonomyNode:
     def __str__(self):
         children_name = [children.get_name() for children in self.children]
         return f"Name: {self.name}\nTask Type: {self.task}\nLabels: {self.labels}\nReturn Type: {self.return_type}\nInput Type: {self.input_priority}\n" \
-               f"Node Type: {self.node_type}\nChildren: {children_name}\n===================="
+               f"Node Type: {self.node_type}\nChildren: {children_name}\n====================\n"
+    
+    def __repr__(self):
+        children_name = [children.get_name() for children in self.children]
+        return f"Name: {self.name}\nTask Type: {self.task}\nLabels: {self.labels}\nReturn Type: {self.return_type}\nInput Type: {self.input_priority}\n" \
+               f"Node Type: {self.node_type}\nChildren: {children_name}\n====================\n"
 
 
 
@@ -59,6 +65,7 @@ class TaxonomyTree:
     def __init__(self, n_levels: int):
         self.n_levels = n_levels
         self.root = TaxonomyNode(name='root', input_priority='NA')
+        self.res = ''
     
     @staticmethod
     def add_metadata(root: TaxonomyNode):
@@ -116,5 +123,24 @@ class TaxonomyTree:
                     )
                 ptr.add_child(newnode)
                 ptr = newnode
+
+    @staticmethod
+    def preorder(root):
+        if len(root.get_children()) == 0:
+            print(root)
+            return
+        print(root)
+        for children in root.get_children():
+            TaxonomyTree.preorder(children)
+
+    def __call__(self, df: pd.DataFrame):
+        for row in df.to_dict(orient='records'):
+            row = list(row.values())
+            self.add(row)
+        TaxonomyTree.add_metadata(self.root)
+    
+    def __str__(self):
+        self.preorder(self.root)
+        return ''
         
                     
