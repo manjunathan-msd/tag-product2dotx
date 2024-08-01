@@ -1,0 +1,8 @@
+A attribute name and it's value is given as input. Take your time and think step by step to return as many synonyms are possible for the value of the attribute.
+Input:
+```
+Attribute Name: {attribute_name}
+Value: {value}
+```
+Keep in mind that you need to return synonyms as many as possible. Each word should start with capital letter. Maintain the format strictly.
+Return only the synonyms as comma seperated values. Don't return any additional text.

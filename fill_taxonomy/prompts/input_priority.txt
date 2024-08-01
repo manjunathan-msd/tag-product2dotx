@@ -1,0 +1,11 @@
+An attribute and sample values are provided as input.
+By analysing the attribute and it's values take the decision that the inout to the classification / extraction model shoulb be text, image or ocr.
+Take your time and think step by step to get the output.
+Input:
+```
+Attribute Name: {attribute_name}
+Sample Values: {sample_values}
+```
+If it's determined that the input shoulb be 'text' return 'Text' or the input should be image then return 'Image' or the input should be ocr return 'Image(OCR)'.
+If you think multiple values among 'Image', 'Text' and 'Image(OCR)' can be the result then return it seperated by comma.
+Return only the output. No additional text is needed.

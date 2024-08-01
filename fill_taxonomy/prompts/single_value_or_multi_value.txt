@@ -1,0 +1,10 @@
+An attribute and sample values are provided as input.
+By analysing the attribute and it's values take the decision that the return value of the classification / extraction task should be single valued or multi valued.
+Take your time and think step by step to get the output.
+Input:
+```
+Attribute Name: {attribute_name}
+Sample Values: {sample_values}
+```
+If it's determined that the return type should be single valued then return 'Single Value' or the return type should be multi valued then return 'Multi Value'.
+Return only the output. No additional text is needed.
