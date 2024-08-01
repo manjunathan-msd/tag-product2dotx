@@ -40,7 +40,7 @@ def timeout(seconds=10, error_message="Function call timed out"):
         return wrapper
     return decorator
 
-openai_client = OpenAI()
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Resize and encode image
 def encode_image(image_path: str):

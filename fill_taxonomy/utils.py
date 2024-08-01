@@ -21,8 +21,7 @@ class FillTaxonomy:
         self.n_levels = n_levels
         self.similarity_matrix = None
         self.client = OpenAI()
-        with open(os.path.join('fill_taxonomy', 'prompts', 'synonyms.txt')) as fp:
-            self.syn_prompt = fp.read()
+        self.syn_prompt = None
         with open(os.path.join('fill_taxonomy', 'prompts', 'classification_or_extraction.txt')) as fp:
             self.task_prompt = fp.read()
         with open(os.path.join('fill_taxonomy', 'prompts', 'single_value_or_multi_value.txt')) as fp:
@@ -155,7 +154,7 @@ class FillTaxonomy:
         res = pd.DataFrame(res)
         return res
 
-    def __call__(self, strategy: str=None):
+    def __call__(self, strategy: str=None, synonym_policy: int=1):
         print("Metadata filling has been started!")
         if strategy:
             if strategy == 'llm':
@@ -176,14 +175,50 @@ class FillTaxonomy:
                 filled_df = self.fill_by_llm()
                 print("Metdata is filled by LLM!")
         print("Synonyms searching using LLM has been started!")
-        attributes = self.df[list(self.df.columns)[self.n_levels - 1]].to_list()
-        values = self.df[list(self.df.columns)[self.n_levels]].to_list()
-        args = []
-        for attr, value_list in zip(attributes, values):
-            for value in value_list.split(','):
-                args.append((attr, value.strip()))
-        with ThreadPoolExecutor(max_workers=16) as executor:
-            res = list(executor.map(lambda p: self.get_synonyms(*p), args))
-        syn_df = pd.DataFrame(res)
+        if synonym_policy == 1:
+            with open(os.path.join('fill_taxonomy', 'prompts', 'synonyms_policy_1.txt')) as fp:
+                self.syn_prompt = fp.read()
+            attributes = self.df[list(self.df.columns)[self.n_levels - 1]].to_list()
+            values = self.df[list(self.df.columns)[self.n_levels]].to_list()
+            args = []
+            for attr, value_list in zip(attributes, values):
+                for value in value_list.split(','):
+                    args.append((attr, value.strip()))
+            with ThreadPoolExecutor(max_workers=16) as executor:
+                res = list(executor.map(lambda p: self.get_synonyms(*p), args))
+            syn_df = pd.DataFrame(res)
+        elif synonym_policy == 2:
+            with open(os.path.join('fill_taxonomy', 'prompts', 'synonyms_policy_2.txt')) as fp:
+                self.syn_prompt = fp.read()
+            attributes = self.df[list(self.df.columns)[self.n_levels - 1]].to_list()
+            values = self.df[list(self.df.columns)[self.n_levels]].to_list()
+            args = []
+            for attr, value in zip(attributes, values):
+                args.append((attr, [x.strip() for x in value.split(',')]))
+            with ThreadPoolExecutor(max_workers=16) as executor:
+                res = list(executor.map(lambda p: self.get_synonyms(*p), args))
+            results = []
+            for rec in res: 
+                attr = rec['Attribute']
+                synonyms = rec['Synonyms']
+                if synonyms.startswith('result') or synonyms.startswith('Result'):
+                    synonyms.replace('result', '')
+                synonyms = synonyms.replace("```", '')
+                synonyms = synonyms.strip()
+                for syn_pair in synonyms.split('\n'):
+                    idx = syn_pair.find(':')
+                    word = syn_pair[:idx]
+                    syns = syn_pair[idx+1:].strip()
+                    results.append(
+                        {
+                            'Attribute': attr,
+                            'Word': word,
+                            'Synonyms': syns
+                        }
+                    )
+            syn_df = pd.DataFrame(results)
+        else:
+            raise ValueError("Invalid synonym policy!")
+        print(syn_df)
         print("All tasks are completed!")
         return filled_df, syn_df

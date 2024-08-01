@@ -1,5 +1,5 @@
 An attribute and sample values are provided as input.
-By analysing the attribute and it's values take the decision that the inout to the classification / extraction model shoulb be text, image or ocr.
+By analysing the attribute and it's values take the decision that the input to the classification / extraction model shoulb be text, image or ocr.
 Take your time and think step by step to get the output.
 Input:
 ```
