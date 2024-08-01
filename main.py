@@ -6,12 +6,15 @@ from utils import *
 logging.basicConfig()
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
+from models.hpt_model import HPT
+
 def initialize_node(node_config, **kwargs):
     """
     Initialize node
     """
-
-    pass
+    agent = HPT()
+    print("LOADED MODEL HOPEFULLY")
+    
     
 
 
