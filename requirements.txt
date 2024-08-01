@@ -3,7 +3,6 @@ tqdm
 rich
 portalocker
 timeout-decorator
-pillow==10.2.0
 omegaconf
 matplotlib
 einops
