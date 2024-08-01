@@ -1,6 +1,6 @@
 # Base & applications
 FROM python:3.7-slim
-RUN apt-get update && apt-get install -y libgomp1 libglib2.0-0 libsm6 libxrender1 libxext6 libgl1-mesa-glx vim
+RUN apt-get update && apt-get install -y libgomp1 libglib2.0-0 libsm6 libxrender1 libxext6 libgl1-mesa-glx vim git
 
 # Define workdir (ref: https://docs.docker.com/engine/reference/builder/#workdir)
 WORKDIR /home/ubuntu/mad/
