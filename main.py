@@ -13,13 +13,14 @@ def initialize_node(node_config, **kwargs):
     Initialize node
     """
     agent = HPT()
-    print("LOADED MODEL HOPEFULLY")
+    log.info("LOADED MODEL HOPEFULLY")
+    log.info(agent)
     
     
 
 
 def process(data):
-    print("HIIIII")
+    log.info("HIIIII")
     return "True"
 
     
