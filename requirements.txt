@@ -16,7 +16,7 @@ seaborn
 tabulate
 xlsxwriter
 typing_extensions==4.7.1
-transformers==4.37.0
+transformers
 accelerate
 mmengine
-bitsandb==0.43.2
+bitsandb
