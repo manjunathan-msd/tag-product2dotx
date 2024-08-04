@@ -21,4 +21,4 @@ RUN chmod +x /home/ubuntu/mad/llmnode/hpt_setup.sh
 RUN /home/ubuntu/mad/llmnode/hpt_setup.sh
 ENV PYTHONPATH="/home/ubuntu/mad/:/home/ubuntu/"
 
-ENTRYPOINT ["python", "/home/ubuntu/mad/llmnode/address_extraction/side-car.py"]
+ENTRYPOINT ["python", "/home/ubuntu/mad/llmnode/side_car.py"]

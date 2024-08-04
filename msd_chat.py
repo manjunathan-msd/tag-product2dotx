@@ -7,7 +7,7 @@ import argparse
 import pandas as pd
 from pprint import pprint
 import time
-sys.path.append("/home/ubuntu/efs/users/manjunathan/tag-product2dotx/HPT/")
+# sys.path.append("/home/ubuntu/efs/users/manjunathan/tag-product2dotx/HPT/")
 # sys.path.append('/home/ubuntu/miniconda3/envs/dev/lib/python3.10/site-packages')
 from models.hpt_model import HPT
 # from template_utils import check_cache

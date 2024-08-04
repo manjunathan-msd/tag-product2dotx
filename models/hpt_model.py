@@ -1,7 +1,7 @@
 # Import libraries
 import sys
-sys.path.append('/home/ubuntu/efs/users/manjunathan/RewardStyle-POC/HPT')
-sys.path.append('/home/ubuntu/efs/users/manjunathan/RewardStyle-POC/template_utils/')
+# sys.path.append('/home/ubuntu/efs/users/manjunathan/RewardStyle-POC/HPT')
+# sys.path.append('/home/ubuntu/efs/users/manjunathan/RewardStyle-POC/template_utils/')
 from PIL import Image
 # from template_utils import check_cache
 from vlmeval.config import supported_VLM
