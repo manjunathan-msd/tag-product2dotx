@@ -17,20 +17,20 @@ def download_model_from_azure(account_name, credentials, container):
 
     blob_service_client = BlobServiceClient(account_url=account_url, credential=credentials)
     container_client = blob_service_client.get_container_client(container=container)
-    print(container_client)
     blobs = container_client.list_blobs(name_starts_with="HyperGAI/HPT1_5-Air-Llama-3-8B-Instruct-multimodal/")
     local_model_path = './HyperGAI/HPT1_5-Air-Llama-3-8B-Instruct-multimodal'
     os.makedirs(local_model_path, exist_ok=True)
 
     for blob in blobs:
-        print(blob.name)
+
+        log.info("Downloading blob - %s",blob.name)
         blob_client = container_client.get_blob_client(blob)
         download_file_path = os.path.join(local_model_path, os.path.relpath(blob.name, "HyperGAI/HPT1_5-Air-Llama-3-8B-Instruct-multimodal/"))
         os.makedirs(os.path.dirname(download_file_path), exist_ok=True)
         with open(download_file_path, "wb") as download_file:
             download_file.write(blob_client.download_blob().readall())
-    
-    log.info("weights downloaded successfully")
+        log.info("Downloaded!")
+    log.info("All weights downloaded successfully")
     
 
 def initialize_node(node_config, **kwargs):
