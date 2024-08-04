@@ -1,14 +1,9 @@
-import os
-import os.path as osp
+
 import string
-import sys
-import warnings
-import re
-import torch.nn as nn
+
 
 import pandas as pd
 import torch
-from huggingface_hub import snapshot_download
 from PIL import Image
 from transformers import (AutoModel, AutoModelForCausalLM, AutoTokenizer,
                           SiglipImageProcessor, 
