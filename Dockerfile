@@ -92,6 +92,9 @@ RUN pip install --index-url https://pypi.org/simple/ azure-storage-blob
 
 # copy entire repo
 
+COPY tag-product2dotx/ /home/ubuntu/mad/llmnode/
+
+
 # set env
 ENV PYTHONPATH="$PYTHONPATH:/home/ubuntu/mad/llmnode/"
 
