@@ -20,4 +20,3 @@ transformers==4.37.0
 accelerate
 mmengine
 bitsandbytes
-torch>=2.0.1
