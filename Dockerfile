@@ -86,7 +86,7 @@ COPY tag-product2dotx/requirements.txt /home/ubuntu/mad/requirements.txt
 
 # DO NOT CHANGE MLAASLIB VERSION for GPU docker
 RUN pip install --index-url $PIP_INDEX_URL --trusted-host pi.madstreetden.xyz mlaaslib==0.0.2
-
+RUN pip install --index-url https://pypi.org/simple/ transformers==4.37.0
 RUN pip install --index-url https://pypi.org/simple/ -r /home/ubuntu/mad/requirements.txt --no-dependencies --no-cache-dir
 RUN pip install --index-url https://pypi.org/simple/ azure-storage-blob
 
