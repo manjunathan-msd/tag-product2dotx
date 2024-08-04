@@ -5,8 +5,7 @@ import numpy as np
 import traceback
 from PIL import Image
 import imagehash
-import json
-from tqdm import tqdm
+
 import os
 
 
@@ -57,18 +56,18 @@ def check_cache(image_url, hash_size=32, base_path= "/efs/users/manjunathan/Rewa
     return image_path
 
 
-def display_image(image_path,figsize=(400, 400)):
-    try:
-        # Open an image file
-        img = Image.open(image_path)
+# def display_image(image_path,figsize=(400, 400)):
+#     try:
+#         # Open an image file
+#         img = Image.open(image_path)
 
-        #Resize Image
-        img = img.resize((figsize[0], figsize[1]))
+#         #Resize Image
+#         img = img.resize((figsize[0], figsize[1]))
         
-        # Display image
-        display(img)
-    except IOError as e:
-        print(f"Error opening image: {e}")
+#         # Display image
+#         display(img)
+#     except IOError as e:
+#         print(f"Error opening image: {e}")
 
 
     

@@ -1,11 +1,6 @@
 #!/bin/bash
 
 
-# Clone the HPT repository
-git clone https://github.com/HyperGAI/HPT.git
-
-# Change directory to HPT
-cd HPT || exit
 
 # Check if HyperGAI directory exists, create if it doesn't
 if [ ! -d "HyperGAI" ]; then
