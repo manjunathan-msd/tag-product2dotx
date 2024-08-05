@@ -4,12 +4,12 @@ from taxonomy_builder.utils import TaxonomyTree
 
 
 # Read data
-df = pd.read_csv('dumps/Beauty taxonomy Final version - Taxonomy class (1).csv')
+df = pd.read_csv('dumps/temp.csv')
 print("Data: \n", df.head())
-df = df.iloc[150:201, :]
+# df = df.iloc[150:201, :]
 
 # Create a taxonomy tree
-taxonomy = TaxonomyTree(n_levels=5)
+taxonomy = TaxonomyTree(n_levels=2)
 
 # # Traverse the tree
 # def preorder(root):
