@@ -20,3 +20,4 @@ transformers==4.37.0
 accelerate
 mmengine
 bitsandbytes
+timm
