@@ -7,8 +7,8 @@ import numpy as np
 import json
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
-import tensorflow as tf
 import tensorflow_hub as hub
+from tqdm import tqdm
 from openai import OpenAI
 
 
@@ -22,15 +22,27 @@ class FillTaxonomy:
         self.similarity_matrix = None
         self.client = OpenAI()
         self.syn_prompt = None
-        with open(os.path.join('fill_taxonomy', 'prompts', 'classification_or_extraction.txt')) as fp:
-            self.task_prompt = fp.read()
-        with open(os.path.join('fill_taxonomy', 'prompts', 'single_value_or_multi_value.txt')) as fp:
-            self.return_prompt = fp.read()
-        with open(os.path.join('fill_taxonomy', 'prompts', 'input_priority.txt')) as fp:
-            self.input_prompt = fp.read()
+        if os.path.exists(os.path.join('fill_taxonomy', 'prompts', 'classification_or_extraction.txt')):
+            with open(os.path.join('fill_taxonomy', 'prompts', 'classification_or_extraction.txt')) as fp:
+                self.task_prompt = fp.read()
+        if os.path.exists(os.path.join('fill_taxonomy', 'prompts', 'single_value_or_multi_value.txt')):
+            with open(os.path.join('fill_taxonomy', 'prompts', 'single_value_or_multi_value.txt')) as fp:
+                self.return_prompt = fp.read()
+        if os.path.exists(os.path.join('fill_taxonomy', 'prompts', 'input_priority.txt')):
+            with open(os.path.join('fill_taxonomy', 'prompts', 'input_priority.txt')) as fp:
+                self.input_prompt = fp.read()
+        if os.path.exists(os.path.join('fill_taxonomy', 'prompts', 'data_type.txt')):
+            with open(os.path.join('fill_taxonomy', 'prompts', 'data_type.txt')) as fp:
+                self.datatype_prompt = fp.read()
+        if os.path.exists(os.path.join('fill_taxonomy', 'prompts', 'ranges.txt')):
+            with open(os.path.join('fill_taxonomy', 'prompts', 'ranges.txt')) as fp:
+                self.ranges_prompt = fp.read()
+        if os.path.exists(os.path.join('fill_taxonomy', 'prompts', 'units.txt')):
+            with open(os.path.join('fill_taxonomy', 'prompts', 'units.txt')) as fp:
+                self.units_prompt = fp.read()
 
     def create_hierarchy(self):
-        self.df['hierarchy'] = self.df.apply(lambda row: ' > '.join(list(row.values)[:self.n_levels]), axis=1)
+        self.df['hierarchy'] = self.df.apply(lambda row: ' > '.join([x for x in row.values if not pd.isna(x)][:self.n_levels]), axis=1)
     
     def get_similarity(self):
         model = hub.load("https://tfhub.dev/google/universal-sentence-encoder/4")
@@ -42,10 +54,15 @@ class FillTaxonomy:
         task_mask = np.array([1 if not pd.isna(x) else 0 for x in self.df['Classification / Extraction'].to_list()])
         return_mask = np.array([1 if not pd.isna(x) else 0 for x in self.df['Single Value / Multi Value'].to_list()])
         input_mask = np.array([1 if not pd.isna(x) else 0 for x in self.df['Input Priority'].to_list()])
+        data_type_mask = np.array([1 if not pd.isna(x) else 0 for x in self.df['Data Type'].to_list()])
+        ranges_mask = np.array([1 if not pd.isna(x) else 0 for x in self.df['Ranges'].to_list()])
+        units_mask = np.array([1 if not pd.isna(x) else 0 for x in self.df['Units'].to_list()])
         self.create_hierarchy()
         self.get_similarity()
         res = []
-        for i, row in enumerate(self.df.to_dict(orient='records')):
+        for i, row in tqdm(enumerate(self.df.to_dict(orient='records')),
+                           desc='Processing Records',
+                           total=len(enumerate(self.df.to_dict(orient='records')))):
             similarity_vector = self.similarity_matrix[i]
             if pd.isna(row['Classification / Extraction']):
                 idx = np.argmax(similarity_vector * task_mask)
@@ -65,6 +82,33 @@ class FillTaxonomy:
                     row['Input Priority'] = default_input
                 else:
                     row['Input Priority'] = self.df.at[idx, 'Input Priority']
+            if pd.isna(row['Data Type']):
+                if row['Classification / Extraction'] == 'Classification':
+                    row['Data Type'] = 'Enum'
+                else:
+                    idx = np.argmax(similarity_vector * data_type_mask)
+                    if pd.isna(self.df.at[idx, 'Data Type']):
+                        row['Data Type'] = 'Enum'
+                    else:
+                        row['Data Type'] = self.df.at[idx, 'Data Type']
+            if pd.isna(row['Ranges']):
+                if row['Data Type'] in ['String', 'Enum']:
+                    row['Ranges'] = 'NA'
+                else:
+                    idx = np.argmax(similarity_vector * ranges_mask)
+                    if pd.isna(self.df.at[idx, 'Ranges']):
+                        row['Ranges'] = 'NA'
+                    else:
+                        row['Ranges'] = self.df.at[idx, 'Units']
+            if pd.isna(row['Units']):
+                if row['Data Type'] in ['String', 'Enum']:
+                    row['Units'] = 'NA'
+                else:
+                    idx = np.argmax(similarity_vector * units_mask)
+                    if pd.isna(self.df.at[idx, 'Units']):
+                        row['Units'] = 'NA'
+                    else:
+                        row['Units'] = self.df.at[idx, 'Units']
             res.append(row)
         res = pd.DataFrame(res)
         res.drop(columns='hierarchy', inplace=True)
@@ -109,6 +153,45 @@ class FillTaxonomy:
         response = response['choices'][0]['message']['content']
         return response
     
+    def get_datatype(self, attribute_name: str, sample_values: str):
+        response = self.client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant who is an expert of taxonomy management."},
+                {"role": "user", "content": self.datatype_prompt.format(attribute_name=attribute_name, sample_values=sample_values)}
+            ]
+        )
+        response = response.json()
+        response = json.loads(response)
+        response = response['choices'][0]['message']['content']
+        return response
+
+    def get_ranges(self, attribute_name: str, sample_values: str):
+        response = self.client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant who is an expert of taxonomy management."},
+                {"role": "user", "content": self.ranges_prompt.format(attribute_name=attribute_name, sample_values=sample_values)}
+            ]
+        )
+        response = response.json()
+        response = json.loads(response)
+        response = response['choices'][0]['message']['content']
+        return response
+
+    def get_unit(self, attribute_name: str, sample_values: str):
+        response = self.client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant who is an expert of taxonomy management."},
+                {"role": "user", "content": self.units_prompt.format(attribute_name=attribute_name, sample_values=sample_values)}
+            ]
+        )
+        response = response.json()
+        response = json.loads(response)
+        response = response['choices'][0]['message']['content']
+        return response
+
     def get_synonyms(self, attribute_name: str, value: str):
         response = self.client.chat.completions.create(
             model="gpt-4o-mini",
@@ -128,14 +211,14 @@ class FillTaxonomy:
     
     def fill_by_llm(self):
         attributes = self.df[list(self.df.columns)[self.n_levels - 1]].to_list()
-        tasks = self.df['Classification / Extraction'].to_list()
-        return_type = self.df['Single Value / Multi Value'].to_list()
-        inputs = self.df['Input Priority'].to_list()
-        tasks_meta = {k: v for k, v in zip(attributes, tasks) if not pd.isna(v)}
-        return_type_meta = {k: v for k, v in zip(attributes, return_type) if not pd.isna(v)}
-        inputs_meta = {k: v for k, v in zip(attributes, inputs) if not pd.isna(v)}
+        tasks_meta = {k: v for k, v in zip(attributes, self.df['Classification / Extraction'].to_list()) if not pd.isna(v)}
+        return_type_meta = {k: v for k, v in zip(attributes, self.df['Single Value / Multi Value'].to_list()) if not pd.isna(v)}
+        inputs_meta = {k: v for k, v in zip(attributes, self.df['Input Priority'].to_list()) if not pd.isna(v)}
+        data_type_meta = {k: v for k, v in zip(attributes, self.df['Data Type'].to_list()) if not pd.isna(v)}
+        ranges_meta = {k: v for k, v in zip(attributes, self.df['Ranges'].to_list()) if not pd.isna(v)}
+        units_meta = {k: v for k, v in zip(attributes, self.df['Units'].to_list()) if not pd.isna(v)}
         res = []
-        for row in self.df.to_dict(orient='records'):
+        for row in tqdm(self.df.to_dict(orient='records'), desc='Processing Records', total=self.df.shape[0]):
             attribute = list(row.values())[self.n_levels - 1]
             values = list(row.values())[self.n_levels]
             if attribute in tasks_meta.keys():
@@ -150,6 +233,27 @@ class FillTaxonomy:
                 row['Input Priority'] = inputs_meta[attribute]
             else:
                 row['Input Priority'] = self.get_input_priority(attribute_name=attribute, sample_values=values)
+            if attribute in data_type_meta.keys():
+                row['Data Type'] = data_type_meta[attribute]
+            else:
+                if row['Classification / Extraction'] == 'Classification':
+                    row['Data Type'] = 'Enum'
+                else:
+                    row['Data Type'] = self.get_datatype(attribute_name=attribute, sample_values=values)
+            if attribute in ranges_meta.keys():
+                row['Ranges'] = ranges_meta[attribute]
+            else:
+                if row['Data Type'] in ['String', 'Enum']:
+                    row['Ranges'] = 'NA'
+                else:
+                    row['Ranges'] = self.get_ranges(attribute_name=attribute, sample_values=values)
+            if attribute in units_meta.keys():
+                row['Units'] = units_meta[attribute]
+            else:
+                if row['Data Type'] in ['String', 'Enum']:
+                    row['Units'] = 'NA'
+                else:
+                    row['Units'] = self.get_unit(attribute_name=attribute, sample_values=values)
             res.append(row)
         res = pd.DataFrame(res)
         return res
@@ -182,10 +286,12 @@ class FillTaxonomy:
             values = self.df[list(self.df.columns)[self.n_levels]].to_list()
             args = []
             for attr, value_list in zip(attributes, values):
+                if pd.isna(value_list):
+                    continue
                 for value in value_list.split(','):
                     args.append((attr, value.strip()))
             with ThreadPoolExecutor(max_workers=16) as executor:
-                res = list(executor.map(lambda p: self.get_synonyms(*p), args))
+                res = list(tqdm(executor.map(lambda p: self.get_synonyms(*p), args), desc='Finding Synonyms', total=len(args)))
             syn_df = pd.DataFrame(res)
         elif synonym_policy == 2:
             with open(os.path.join('fill_taxonomy', 'prompts', 'synonyms_policy_2.txt')) as fp:
@@ -194,9 +300,11 @@ class FillTaxonomy:
             values = self.df[list(self.df.columns)[self.n_levels]].to_list()
             args = []
             for attr, value in zip(attributes, values):
+                if pd.isna(value):
+                    continue
                 args.append((attr, [x.strip() for x in value.split(',')]))
             with ThreadPoolExecutor(max_workers=16) as executor:
-                res = list(executor.map(lambda p: self.get_synonyms(*p), args))
+                res = list(tqdm(executor.map(lambda p: self.get_synonyms(*p), args), desc='Finding Synonyms', total=len(args)))
             results = []
             for rec in res: 
                 attr = rec['Attribute']
@@ -219,6 +327,5 @@ class FillTaxonomy:
             syn_df = pd.DataFrame(results)
         else:
             raise ValueError("Invalid synonym policy!")
-        print(syn_df)
         print("All tasks are completed!")
         return filled_df, syn_df
