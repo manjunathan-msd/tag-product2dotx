@@ -26,6 +26,9 @@ class TaxonomyNode:
 
     def add_labels(self, labels: list):
         self.labels = labels
+    
+    def get_labels(self):
+        return self.labels
 
     def add_task(self, task: str):
         self.task = task

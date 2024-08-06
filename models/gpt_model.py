@@ -7,6 +7,8 @@ from PIL import Image
 import json
 from openai import OpenAI
 import requests
+import traceback
+import time
 
 #Timeout Check Class- to avoid stuck vals
 from functools import wraps
@@ -88,6 +90,7 @@ def inference_by_chatgpt(context: str, image_path: str, prompt: str, tax_vals: s
           ]
         }
         response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload, timeout=15)  # 9 seconds timeout for the request
+        # print("Response:",response.text)
         response = response.json()
         response = response['choices'][0]['message']['content']
         try:
@@ -98,6 +101,7 @@ def inference_by_chatgpt(context: str, image_path: str, prompt: str, tax_vals: s
         print("Inference timed out after 10 seconds.")
         return {}
     except Exception as e:
+        print(traceback.format_exc())
         print(f"An error occurred: {str(e)}")
         return {}
 
