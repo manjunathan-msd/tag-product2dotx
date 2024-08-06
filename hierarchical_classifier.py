@@ -16,7 +16,7 @@ from utils.timer_utils import tic, toc
 from utils.postprocess_utils import convert_demosite_format
 
 # Import the TaxonomyTree and TaxonomyNode classes
-from taxonomy_builder.utils import TaxonomyTree, TaxonomyNode,print_info
+from taxonomy_builder.utils import TaxonomyTree, TaxonomyNode
 
 # Logging the Timings
 timing_dict = {}
@@ -50,11 +50,9 @@ def create_taxonomy_tree():
             "Single Value/ Multi Value":"Single Value / Multi Value"
         },inplace=True)
         df = pd.concat([df, tax_df], ignore_index=True)
-    print(f"Taking a Taxonomy DF of shape: {df.shape}")
-    print(df.columns)
+
     tree = TaxonomyTree(n_levels=5)  # Adjust the number of levels as needed
     tree(df)
-    print("Taxonomy tree is created!")
     return tree
 
 #Match Response to the Corresponding Child Node.
@@ -120,8 +118,7 @@ def traverse_tree_and_classify(agent, max_depth, context, image_path, classifica
     classification_result = {}
 
     while depth < max_depth and current_node.get_children() and not (current_node.get_node_type().lower().strip()=="na" and depth!=0):
-        print("Within a Classification Node")
-        # print_info(current_node)
+        print("----Classification Node----")
         tic(timing_dict, f"L{depth}")
         
         # Get labels of children nodes
@@ -138,7 +135,6 @@ def traverse_tree_and_classify(agent, max_depth, context, image_path, classifica
         chosen_child = match_response_to_child(res, current_node.get_children())
         
         print(f"Closest Child Is: {chosen_child}")
-        # time.sleep(10)
         if chosen_child:
             classification_result[f"L{depth}"] = chosen_child.get_name().split('>')[-1]
             current_node = chosen_child
@@ -152,7 +148,7 @@ def traverse_tree_and_classify(agent, max_depth, context, image_path, classifica
     print("Loop has been broken, No child Present")
     # Handle leaf node
     if current_node.get_node_type()=="NA" and depth!=0:
-        print("-------------This is a Leaf Node-----------------")
+        print("-------------Leaf Node-----------------")
         taxonomy_schema={}
         for attribute_node in current_node.get_children():
             attribute_name=attribute_node.get_name().split(">")[-1]
@@ -170,13 +166,9 @@ def traverse_tree_and_classify(agent, max_depth, context, image_path, classifica
             
             taxonomy_schema[attribute_name]["Return Type"]=attribute_return
 
-            # print("Taxonomy Schema is ",taxonomy_schema)
-            
-        
-        
+    
         tic(timing_dict, f"L{depth}")
         res = agent(context=context, prompt=attribute_prompt, image_path=image_path, tax_vals=taxonomy_schema)
-        print("Raw Agent Response:",res)
         classification_result[f"L{depth}"] = res
         toc(timing_dict, f"L{depth}")
 
@@ -188,7 +180,6 @@ def process_input_and_infer(csv_path):
     taxonomy_tree = create_taxonomy_tree()
     df = pd.read_csv(csv_path)
     
-    # df=df.tail(1)
     for index, row in tqdm(df.iterrows(), total=df.shape[0], desc="Processing items"):
         context = f"Title Of the Product: {row['title']}\nDescription of the Product: {row['description']}"
         image_url = row['image url']
