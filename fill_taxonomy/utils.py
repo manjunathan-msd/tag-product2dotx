@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 from concurrent.futures import ThreadPoolExecutor
+import re
 import numpy as np
 import json
 import pandas as pd
@@ -15,7 +16,7 @@ from openai import OpenAI
 
 
 # Class to fill the taxonomy
-class FillTaxonomy:
+class FillMetaData:
     def __init__(self, df: pd.DataFrame, n_levels: int):
         self.df = df.reset_index(drop=True)
         self.n_levels = n_levels
@@ -236,7 +237,7 @@ class FillTaxonomy:
             if attribute in data_type_meta.keys():
                 row['Data Type'] = data_type_meta[attribute]
             else:
-                if row['Classification / Extraction'] == 'Classification':
+                if 'classification' in row['Classification / Extraction'].lower():
                     row['Data Type'] = 'Enum'
                 else:
                     row['Data Type'] = self.get_datatype(attribute_name=attribute, sample_values=values)
@@ -278,15 +279,16 @@ class FillTaxonomy:
             else:
                 filled_df = self.fill_by_llm()
                 print("Metdata is filled by LLM!")
-        print("Synonyms searching using LLM has been started!")
+        # print("Synonyms searching using LLM has been started!")
         if synonym_policy == 1:
             with open(os.path.join('fill_taxonomy', 'prompts', 'synonyms_policy_1.txt')) as fp:
                 self.syn_prompt = fp.read()
-            attributes = self.df[list(self.df.columns)[self.n_levels - 1]].to_list()
-            values = self.df[list(self.df.columns)[self.n_levels]].to_list()
+            attributes = filled_df[list(filled_df.columns)[self.n_levels - 1]].to_list()
+            values = filled_df[list(filled_df.columns)[self.n_levels]].to_list()
+            data_types = filled_df['Data Type'].to_list()
             args = []
-            for attr, value_list in zip(attributes, values):
-                if pd.isna(value_list):
+            for attr, value_list, data_type in zip(attributes, values, data_types):
+                if pd.isna(value_list) or data_type == 'Numeric':
                     continue
                 for value in value_list.split(','):
                     args.append((attr, value.strip()))
@@ -298,9 +300,10 @@ class FillTaxonomy:
                 self.syn_prompt = fp.read()
             attributes = self.df[list(self.df.columns)[self.n_levels - 1]].to_list()
             values = self.df[list(self.df.columns)[self.n_levels]].to_list()
+            data_types = filled_df['Data Type'].to_list()
             args = []
-            for attr, value in zip(attributes, values):
-                if pd.isna(value):
+            for attr, value, data_type in zip(attributes, values, data_types):
+                if pd.isna(value) or data_type == 'Numeric':
                     continue
                 args.append((attr, [x.strip() for x in value.split(',')]))
             with ThreadPoolExecutor(max_workers=16) as executor:
@@ -329,3 +332,25 @@ class FillTaxonomy:
             raise ValueError("Invalid synonym policy!")
         print("All tasks are completed!")
         return filled_df, syn_df
+    
+
+class FillValues:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df
+        self.valid_cols = [re.search(r'\bL\d+\b', x).group() for x in self.df.columns if re.search(r'\bL\d+\b', x)]
+        self.valid_cols.append('A')
+        print(self.valid_cols)
+    
+    def get_values(self, attribute_name: str, sample_values: str):
+        response = self.client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant who is an expert of taxonomy management."},
+                {"role": "user", "content": self.datatype_prompt.format(attribute_name=attribute_name, sample_values=sample_values)}
+            ]
+        )
+        response = response.json()
+        response = json.loads(response)
+        response = response['choices'][0]['message']['content']
+        return response
+

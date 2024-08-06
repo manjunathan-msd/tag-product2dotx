@@ -6,5 +6,5 @@ Input:
 Attribute Name: {attribute_name}
 Sample Values: {sample_values}
 ```
-Return the output in this format: "<upper range> - <lower range>"
+Return the output in this format: "<lower range> - <upper range>"
 Return only the output. No additional text is needed.
