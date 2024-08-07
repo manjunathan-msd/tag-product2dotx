@@ -1,13 +1,22 @@
 # Import libraries
+import numpy as np
 import pandas as pd
-from fill_taxonomy.utils import FillValues, FillMetaData
-import tensorflow_hub as hub
+from sklearn.metrics import classification_report
+from fill_taxonomy.utils import FillMetaData
+
+
 
 # Read data
-df = pd.read_csv('dumps/Taxonomy SneakerDrunk - apparel- IGNORE.csv')
+df = pd.read_csv('dumps/Beauty taxonomy Final version - Taxonomy class (1).csv')
+# df = df.sample(n=5, random_state=32)
+df = df.head(10)
+temp_df = df.copy()
+print(temp_df)
+for col in ['Classification / Extraction', 'Single Value / Multi Value', 'Input Priority']:
+    temp_df[col] = np.nan
 
 # Declare object
-obj = FillMetaData(df, n_levels=4)
+obj = FillMetaData(temp_df)
 
 # # Fill data
 # '''
@@ -20,5 +29,11 @@ obj = FillMetaData(df, n_levels=4)
 filled_df, syn_df = obj(strategy='llm', synonym_policy=1)
 print(filled_df.isnull().sum())
 print(syn_df.isnull().sum())
-filled_df.to_csv('dumps/apparel_metadata.csv', index=False)
-syn_df.to_csv('dumps/apparel_synonyms.csv', index=False)
+# for col in ['Classification / Extraction', 'Single Value / Multi Value', 'Input Priority']:
+#     print(col)
+#     print(classification_report(
+#         df[col].to_list(), filled_df[col].to_list()
+#     ))
+#     print("=============================================")
+filled_df.to_csv('dumps/beauty_metadata.csv', index=False)
+syn_df.to_csv('dumps/beauty_synonyms.csv', index=False)

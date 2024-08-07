@@ -17,9 +17,17 @@ from openai import OpenAI
 
 # Class to fill the taxonomy
 class FillMetaData:
-    def __init__(self, df: pd.DataFrame, n_levels: int):
+    def __init__(self, df: pd.DataFrame):
         self.df = df.reset_index(drop=True)
-        self.n_levels = n_levels
+        levels = [re.search(r'\bL\d+\b', x).group() for x in self.df.columns if re.search(r'\bL\d+\b', x)]
+        if 'A' in list(self.df.columns) and 'V' in list(self.df.columns):
+            self.n_levels = len(levels) + 1
+        else:
+            self.n_levels = len(levels) - 1
+        for col in ['Classification / Extraction', 'Single Value / Multi Value', 'Input Priority',
+                    'Data Type', 'Ranges', 'Units']:
+            if col not in list(self.df.columns):
+                self.df[col] = np.nan
         self.similarity_matrix = None
         self.client = OpenAI()
         self.syn_prompt = None
@@ -40,7 +48,7 @@ class FillMetaData:
                 self.ranges_prompt = fp.read()
         if os.path.exists(os.path.join('fill_taxonomy', 'prompts', 'units.txt')):
             with open(os.path.join('fill_taxonomy', 'prompts', 'units.txt')) as fp:
-                self.units_prompt = fp.read()
+                self.units_prompt = fp.read()      
 
     def create_hierarchy(self):
         self.df['hierarchy'] = self.df.apply(lambda row: ' > '.join([x for x in row.values if not pd.isna(x)][:self.n_levels]), axis=1)
@@ -205,8 +213,8 @@ class FillMetaData:
         response = json.loads(response)
         response = response['choices'][0]['message']['content']
         return {
-            'Attribute': attribute_name,
-            'Word': value,
+            'Breadcrumb': attribute_name,
+            'V': value,
             'Synonyms': response
         }
     
@@ -279,11 +287,11 @@ class FillMetaData:
             else:
                 filled_df = self.fill_by_llm()
                 print("Metdata is filled by LLM!")
-        # print("Synonyms searching using LLM has been started!")
+        print("Synonyms searching using LLM has been started!")
         if synonym_policy == 1:
             with open(os.path.join('fill_taxonomy', 'prompts', 'synonyms_policy_1.txt')) as fp:
                 self.syn_prompt = fp.read()
-            attributes = filled_df[list(filled_df.columns)[self.n_levels - 1]].to_list()
+            attributes = filled_df.apply(lambda row: '>'.join([list(row.values)[i].strip() for i in range(self.n_levels) if not pd.isna(list(row.values)[i])]), axis=1)
             values = filled_df[list(filled_df.columns)[self.n_levels]].to_list()
             data_types = filled_df['Data Type'].to_list()
             args = []
@@ -298,7 +306,7 @@ class FillMetaData:
         elif synonym_policy == 2:
             with open(os.path.join('fill_taxonomy', 'prompts', 'synonyms_policy_2.txt')) as fp:
                 self.syn_prompt = fp.read()
-            attributes = self.df[list(self.df.columns)[self.n_levels - 1]].to_list()
+            attributes = filled_df.apply(lambda row: '>'.join([list(row.values)[i] for i in range(self.n_levels) if not pd.isna(list(row.values)[i])]), axis=1)
             values = self.df[list(self.df.columns)[self.n_levels]].to_list()
             data_types = filled_df['Data Type'].to_list()
             args = []
@@ -338,7 +346,10 @@ class FillValues:
     def __init__(self, df: pd.DataFrame):
         self.df = df
         self.valid_cols = [re.search(r'\bL\d+\b', x).group() for x in self.df.columns if re.search(r'\bL\d+\b', x)]
-        self.valid_cols.append('A')
+        if 'A' in self.df.columns:
+            self.valid_cols.append('A')
+        else:
+            self.valid_cols.pop()
         print(self.valid_cols)
     
     def get_values(self, attribute_name: str, sample_values: str):
