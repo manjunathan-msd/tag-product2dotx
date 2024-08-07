@@ -109,7 +109,7 @@ def match_response_to_child(response, children, fuzzy_threshold=80):
 
 
 # Traverse Taxonomy Tree and Generate Output
-def traverse_tree_and_classify(agent, max_depth, context, image_path, classification_prompt, attribute_prompt, taxonomy_tree):
+def traverse_tree_and_classify(agent, max_depth, context, image_path, classification_prompt, attribute_prompt, taxonomy_tree,use_meta=True):
     if not max_depth:
         max_depth = 100
     
