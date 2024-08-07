@@ -7,7 +7,6 @@ from fuzzywuzzy import fuzz
 from models.gpt_model import inference_by_chatgpt
 from utils.image_utils import check_cache
 from utils.timer_utils import tic, toc
-from utils.postprocess_utils import convert_demosite_format
 from taxonomy_builder.utils import TaxonomyTree, TaxonomyNode
 
 class Tagger2dotX:
@@ -128,7 +127,7 @@ class Tagger2dotX:
 
     def __call__(self, record):
         # Separate 'image url' and other non-free form text columns
-        excluded_columns = ['image url', 'Standard_Output', 'Custom_Output']  # Add other non-free form text columns here
+        excluded_columns = ['image url', 'Standard Output', 'Custom Output']  # Add other non-free form text columns here
         
         # Combine all other columns into the context
         context_parts = []
@@ -147,11 +146,11 @@ class Tagger2dotX:
         
         try:
             standard_output = self.traverse_tree_and_classify(context=context, image_path=image_path)
-            # custom_output = self.agent(context=context, image_path=image_path, prompt=self.custom_prompt)
+            custom_output = self.agent(context=context, image_path=image_path, prompt=self.custom_prompt)
             
             return {
-                'Standard_Output': json.dumps(standard_output, indent=4),
-                # 'Custom_Output': json.dumps(custom_output, indent=4)
+                'Standard Output': json.dumps(standard_output, indent=4),
+                'Custom Output': json.dumps(custom_output, indent=4)
             }
         except Exception as e:
             print(f"Error processing record: {str(e)}")

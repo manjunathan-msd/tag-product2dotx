@@ -94,25 +94,26 @@ def transform_breadcrumb(breadcrumb):
     if not transformed_levels:
         return breadcrumb
     
-    return ' > '.join(transformed_levels)
+    return '>'.join(transformed_levels)
 
 
-def convert_demosite_format(df_lis):
-    for rec in df_lis:
-        if pd.notna(rec.get("Standard Output")):
-            main_attributes=json.loads(rec.get("Standard Output"))
-            
-            breadcrumb,attributes=process_json(main_attributes)
-            rec.update({
-                "Breadcrumb Intermediate":breadcrumb,
-                "Attributes Intermediate":json.dumps(attributes)
-            })
+def convert_demosite_format(rec):
 
-    temp=pd.DataFrame(df_lis)
-    temp["Breadcrumb"]=temp["Breadcrumb Intermediate"].apply(transform_breadcrumb)
-    temp["Attributes"]=temp["Attributes Intermediate"].apply(remove_not_specified)
-    # temp["Extras"]=temp["Extras Output"].apply(remove_not_specified)
-    temp.drop(columns=["Breadcrumb Intermediate","Attributes Intermediate"],inplace=True)
-    temp.columns = [col.capitalize() if col != "image url" else col for col in temp.columns]
+    op={}
+
+    if pd.notna(rec.get("Standard Output")):
+        main_attributes=json.loads(rec.get("Standard Output"))
+        
+        breadcrumb,attributes=process_json(main_attributes)
+        breadcrumb_processed=transform_breadcrumb(breadcrumb)
+        attributes_processed=remove_not_specified(json.dumps(attributes))
+
+        op["Breadcrumb"]=breadcrumb_processed
+        op["Attributes"]=attributes_processed
+
     
-    return temp
+    if pd.notna(rec.get("Custom Output",None)):
+        op["Extras"]=remove_not_specified(rec.get("Custom Output"))
+
+    
+    return op
