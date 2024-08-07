@@ -31,8 +31,8 @@ def read_image(image_url):
     
     return image
 
-def check_cache(image_url, hash_size=32, base_path= "/efs/users/manjunathan/RewardStyle-POC/data/image_data"):
-    
+def check_cache(image_url, hash_size=32, base_path= "/efs/users/manjunathan/dumps/image_data"):
+    os.makedirs(base_path,exist_ok=True)
     try:
         np_image=read_image(image_url)
     except:
