@@ -7,11 +7,9 @@ from fill_taxonomy.utils import FillMetaData
 
 
 # Read data
-df = pd.read_csv('dumps/Beauty taxonomy Final version - Taxonomy class (1).csv')
-# df = df.sample(n=5, random_state=32)
-df = df.head(10)
+df = pd.read_csv('dumps/FASHION MASTER TAXONOMY - DEV - Taxonomy class (2).csv')
+df = df.sample(n=50, random_state=32)
 temp_df = df.copy()
-print(temp_df)
 for col in ['Classification / Extraction', 'Single Value / Multi Value', 'Input Priority']:
     temp_df[col] = np.nan
 
@@ -26,7 +24,7 @@ obj = FillMetaData(temp_df)
 # Synonym filling is always done by llm.
 # If you are not sure about what to use, leave it empty. It will decide by itself.
 # '''
-filled_df, syn_df = obj(strategy='llm', synonym_policy=1)
+filled_df, syn_df = obj(strategy='llm', synonym_policy=2)
 print(filled_df.isnull().sum())
 print(syn_df.isnull().sum())
 # for col in ['Classification / Extraction', 'Single Value / Multi Value', 'Input Priority']:
@@ -35,5 +33,5 @@ print(syn_df.isnull().sum())
 #         df[col].to_list(), filled_df[col].to_list()
 #     ))
 #     print("=============================================")
-filled_df.to_csv('dumps/beauty_metadata.csv', index=False)
-syn_df.to_csv('dumps/beauty_synonyms.csv', index=False)
+filled_df.to_csv('dumps/fashion_metadata.csv', index=False)
+syn_df.to_csv('dumps/fashion_synonyms.csv', index=False)

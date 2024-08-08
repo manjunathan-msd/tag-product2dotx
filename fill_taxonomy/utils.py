@@ -10,6 +10,7 @@ import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 import tensorflow_hub as hub
 from tqdm import tqdm
+tqdm.pandas()
 from openai import OpenAI
 
 
@@ -317,8 +318,8 @@ class FillMetaData:
             with ThreadPoolExecutor(max_workers=16) as executor:
                 res = list(tqdm(executor.map(lambda p: self.get_synonyms(*p), args), desc='Finding Synonyms', total=len(args)))
             results = []
-            for rec in res: 
-                attr = rec['Attribute']
+            for rec in res:
+                attr = rec['Breadcrumb']
                 synonyms = rec['Synonyms']
                 if synonyms.startswith('result') or synonyms.startswith('Result'):
                     synonyms.replace('result', '')
@@ -330,8 +331,8 @@ class FillMetaData:
                     syns = syn_pair[idx+1:].strip()
                     results.append(
                         {
-                            'Attribute': attr,
-                            'Word': word,
+                            'Breadcrumb': attr,
+                            'V': word.replace('"', ''),
                             'Synonyms': syns
                         }
                     )
@@ -343,25 +344,56 @@ class FillMetaData:
     
 
 class FillValues:
-    def __init__(self, df: pd.DataFrame):
+    def __init__(self, df: pd.DataFrame, prompt_path: str):
         self.df = df
         self.valid_cols = [re.search(r'\bL\d+\b', x).group() for x in self.df.columns if re.search(r'\bL\d+\b', x)]
-        if 'A' in self.df.columns:
-            self.valid_cols.append('A')
-        else:
-            self.valid_cols.pop()
-        print(self.valid_cols)
+        self.valid_cols.append('A')
+        with open(prompt_path) as fp:
+            self.prompt = fp.read()
     
-    def get_values(self, attribute_name: str, sample_values: str):
+    def get_values(self, breadcrumb: str):
         response = self.client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant who is an expert of taxonomy management."},
-                {"role": "user", "content": self.datatype_prompt.format(attribute_name=attribute_name, sample_values=sample_values)}
+                {"role": "user", "content": self.prompt.format(attribute_name=breadcrumb)}
             ]
         )
         response = response.json()
         response = json.loads(response)
         response = response['choices'][0]['message']['content']
         return response
+    
+    def __call__(self, df: pd.DataFrame):
+        self.df['breadcrumb'] = self.df.apply(lambda row: '>'.join([row[x] for x in  self.valid_cols if not pd.isna(row[x])]), axis=1)
+        self.df['V'] = self.df['breadcrumb'].apply(self.get_values)
+        self.df.drop(colummns='breadcrumb', inplace=True)
+        return self.df
+    
 
+
+class FillAttributes:
+    def __init__(self, df: pd.DataFrame, prompt_path: str):
+        self.df = df
+        self.valid_cols = [re.search(r'\bL\d+\b', x).group() for x in self.df.columns if re.search(r'\bL\d+\b', x)]
+        with open(prompt_path) as fp:
+            self.prompt = fp.read()
+    
+    def get_values(self, breadcrumb: str):
+        response = self.client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant who is an expert of taxonomy management."},
+                {"role": "user", "content": self.prompt.format(attribute_name=breadcrumb)}
+            ]
+        )
+        response = response.json()
+        response = json.loads(response)
+        response = response['choices'][0]['message']['content']
+        return response
+    
+    def __call__(self, df: pd.DataFrame):
+        self.df['breadcrumb'] = self.df.apply(lambda row: '>'.join([row[x] for x in  self.valid_cols if not pd.isna(row[x])]), axis=1)
+        self.df['V'] = self.df['breadcrumb'].apply(self.get_values)
+        self.df.drop(colummns='breadcrumb', inplace=True)
+        return self.df
