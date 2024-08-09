@@ -1,5 +1,10 @@
 dumps/
 prompts/
+HPT/*
+HPT/
+HPT
+/HPT/*
+
 __pycache__/
 *.py[cod]
 *$py.class
