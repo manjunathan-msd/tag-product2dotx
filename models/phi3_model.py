@@ -29,7 +29,7 @@ class Phi3:
             formatted_prompt = prompt.format(context=context, taxonomy=tax_vals)
         else:
             formatted_prompt = prompt.format(context=context)
-            inputs = self.tokenizer.apply_chat_template(formatted_prompt, add_generation_prompt=True, return_tensors="pt").to('cuda')
-            outputs = self.model.generate(inputs, max_new_tokens=max_new_tokens)
-            text = self.tokenizer.batch_decode(outputs)[0]
-            return self.post_processing(text)
+        inputs = self.tokenizer.apply_chat_template(formatted_prompt, add_generation_prompt=True, return_tensors="pt").to('cuda')
+        outputs = self.model.generate(inputs, max_new_tokens=max_new_tokens)
+        text = self.tokenizer.batch_decode(outputs)[0]
+        return self.post_processing(text)
