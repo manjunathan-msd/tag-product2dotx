@@ -44,7 +44,7 @@ class Tagger2dotX:
         return df
     
     def create_taxonomy_tree(self):
-        tree = TaxonomyTree(n_levels=self.taxonomy_depth)
+        tree = TaxonomyTree()
         tree(self.taxonomy_df)
         return tree
 
@@ -117,7 +117,6 @@ class Tagger2dotX:
                     }
                 else:
                     taxonomy_schema[attribute_name] = attribute_values
-
             tic(self.timing_dict, f"L{depth}")
             res = self.agent(context=context, prompt=self.attribute_prompt, image_path=image_path, tax_vals=taxonomy_schema)
             classification_result[f"L{depth}"] = res
