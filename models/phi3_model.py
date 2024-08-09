@@ -24,7 +24,7 @@ class Phi3:
         text = text.replace('<|assistant|>', '').replace('<|end|>', '').strip()
         return text
 
-    def __call__(self, context: str, prompt: str, tax_vals: str = None, max_new_tokens : int = 256):
+    def __call__(self, context: str, prompt: str, image_path: str = None, tax_vals: str = None, max_new_tokens : int = 256):
         if tax_vals:
             formatted_prompt = prompt.format(context=context, taxonomy=tax_vals)
         else:
