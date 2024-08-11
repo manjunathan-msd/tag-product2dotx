@@ -1,367 +1,402 @@
 # Import libraries
-import os
 from dotenv import load_dotenv
 load_dotenv()
 from concurrent.futures import ThreadPoolExecutor
 import re
 import numpy as np
-import json
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
-import tensorflow_hub as hub
 from tqdm import tqdm
-from openai import OpenAI
+from models.chatgpt import MetaChatGPT
 
 
-
-
-# Class to fill the taxonomy
-class FillMetaData:
-    def __init__(self, df: pd.DataFrame):
-        self.df = df.reset_index(drop=True)
-        levels = [re.search(r'\bL\d+\b', x).group() for x in self.df.columns if re.search(r'\bL\d+\b', x)]
-        if 'A' in list(self.df.columns) and 'V' in list(self.df.columns):
-            self.n_levels = len(levels) + 1
+'''
+Definition: The class can metdata when a taxonomy is given
+'''
+class FillMetadata:
+    # Constructor
+    def __init__(self, metadata: dict = None):
+        self.client = None
+        if metadata:
+            self.metadata = metadata
         else:
-            self.n_levels = len(levels) - 1
-        for col in ['Classification / Extraction', 'Single Value / Multi Value', 'Input Priority',
-                    'Data Type', 'Ranges', 'Units']:
-            if col not in list(self.df.columns):
-                self.df[col] = np.nan
-        self.similarity_matrix = None
-        self.client = OpenAI()
-        self.syn_prompt = None
-        if os.path.exists(os.path.join('fill_taxonomy', 'prompts', 'classification_or_extraction.txt')):
-            with open(os.path.join('fill_taxonomy', 'prompts', 'classification_or_extraction.txt')) as fp:
-                self.task_prompt = fp.read()
-        if os.path.exists(os.path.join('fill_taxonomy', 'prompts', 'single_value_or_multi_value.txt')):
-            with open(os.path.join('fill_taxonomy', 'prompts', 'single_value_or_multi_value.txt')) as fp:
-                self.return_prompt = fp.read()
-        if os.path.exists(os.path.join('fill_taxonomy', 'prompts', 'input_priority.txt')):
-            with open(os.path.join('fill_taxonomy', 'prompts', 'input_priority.txt')) as fp:
-                self.input_prompt = fp.read()
-        if os.path.exists(os.path.join('fill_taxonomy', 'prompts', 'data_type.txt')):
-            with open(os.path.join('fill_taxonomy', 'prompts', 'data_type.txt')) as fp:
-                self.datatype_prompt = fp.read()
-        if os.path.exists(os.path.join('fill_taxonomy', 'prompts', 'ranges.txt')):
-            with open(os.path.join('fill_taxonomy', 'prompts', 'ranges.txt')) as fp:
-                self.ranges_prompt = fp.read()
-        if os.path.exists(os.path.join('fill_taxonomy', 'prompts', 'units.txt')):
-            with open(os.path.join('fill_taxonomy', 'prompts', 'units.txt')) as fp:
-                self.units_prompt = fp.read()      
+            self.metadata = {
+                'Classification / Extraction': 'prompts/classification_or_extraction.txt', 
+                'Single Value / Multi Value': 'prompts/single_value_or_multi_value.txt', 
+                'Input Priority': 'prompts/input_priority.txt',
+                'Data Type': 'prompts/data_type.txt', 
+                'Ranges': 'prompts/ranges.txt', 
+                'Units': 'prompts/units.txt'
+            }
 
-    def create_hierarchy(self):
-        self.df['hierarchy'] = self.df.apply(lambda row: ' > '.join([x for x in row.values if not pd.isna(x)][:self.n_levels]), axis=1)
-    
-    def get_similarity(self):
-        model = hub.load("https://tfhub.dev/google/universal-sentence-encoder/4")
-        encoded_vector = model(self.df['hierarchy'].to_list()).numpy()
-        self.similarity_matrix = cosine_similarity(encoded_vector)
-    
-    def fill_by_similarity(self, default_task: str = 'classification', default_return: str = 'single', 
-                           default_input: str = 'text'):
-        task_mask = np.array([1 if not pd.isna(x) else 0 for x in self.df['Classification / Extraction'].to_list()])
-        return_mask = np.array([1 if not pd.isna(x) else 0 for x in self.df['Single Value / Multi Value'].to_list()])
-        input_mask = np.array([1 if not pd.isna(x) else 0 for x in self.df['Input Priority'].to_list()])
-        data_type_mask = np.array([1 if not pd.isna(x) else 0 for x in self.df['Data Type'].to_list()])
-        ranges_mask = np.array([1 if not pd.isna(x) else 0 for x in self.df['Ranges'].to_list()])
-        units_mask = np.array([1 if not pd.isna(x) else 0 for x in self.df['Units'].to_list()])
-        self.create_hierarchy()
-        self.get_similarity()
-        res = []
-        for i, row in tqdm(enumerate(self.df.to_dict(orient='records')),
-                           desc='Processing Records',
-                           total=len(enumerate(self.df.to_dict(orient='records')))):
-            similarity_vector = self.similarity_matrix[i]
-            if pd.isna(row['Classification / Extraction']):
-                idx = np.argmax(similarity_vector * task_mask)
-                if pd.isna(self.df.at[idx, 'Classification / Extraction']):
-                    row['Classification / Extraction'] = default_task
-                else:
-                    row['Classification / Extraction'] = self.df.at[idx, 'Classification / Extraction']
-            if pd.isna(row['Single Value / Multi Value']):
-                idx = np.argmax(similarity_vector * return_mask)
-                if pd.isna(self.df.at[idx, 'Single Value / Multi Value']):
-                    row['Single Value / Multi Value'] = default_return
-                else:
-                    row['Single Value / Multi Value'] = self.df.at[idx, 'Single Value / Multi Value']
-            if pd.isna(row['Input Priority']):
-                idx = np.argmax(similarity_vector * input_mask)
-                if pd.isna(self.df.at[idx, 'Input Priority']):
-                    row['Input Priority'] = default_input
-                else:
-                    row['Input Priority'] = self.df.at[idx, 'Input Priority']
-            if pd.isna(row['Data Type']):
-                if row['Classification / Extraction'] == 'Classification':
-                    row['Data Type'] = 'Enum'
-                else:
-                    idx = np.argmax(similarity_vector * data_type_mask)
-                    if pd.isna(self.df.at[idx, 'Data Type']):
-                        row['Data Type'] = 'Enum'
-                    else:
-                        row['Data Type'] = self.df.at[idx, 'Data Type']
-            if pd.isna(row['Ranges']):
-                if row['Data Type'] in ['String', 'Enum']:
-                    row['Ranges'] = 'NA'
-                else:
-                    idx = np.argmax(similarity_vector * ranges_mask)
-                    if pd.isna(self.df.at[idx, 'Ranges']):
-                        row['Ranges'] = 'NA'
-                    else:
-                        row['Ranges'] = self.df.at[idx, 'Units']
-            if pd.isna(row['Units']):
-                if row['Data Type'] in ['String', 'Enum']:
-                    row['Units'] = 'NA'
-                else:
-                    idx = np.argmax(similarity_vector * units_mask)
-                    if pd.isna(self.df.at[idx, 'Units']):
-                        row['Units'] = 'NA'
-                    else:
-                        row['Units'] = self.df.at[idx, 'Units']
-            res.append(row)
-        res = pd.DataFrame(res)
-        res.drop(columns='hierarchy', inplace=True)
-        return res
-
-    def get_task(self, attribute_name: str, sample_values: list):
-        response = self.client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant who is an expert machine learning engineer."},
-                {"role": "user", "content": self.task_prompt.format(attribute_name=attribute_name, sample_values=sample_values)}
-            ]
-        )
-        response = response.json()
-        response = json.loads(response)
-        response = response['choices'][0]['message']['content']
-        return response
-    
-    def get_return_type(self, attribute_name: str, sample_values: list):
-        response = self.client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant who is an expert machine learning engineer."},
-                {"role": "user", "content": self.return_prompt.format(attribute_name=attribute_name, sample_values=sample_values)}
-            ]
-        )
-        response = response.json()
-        response = json.loads(response)
-        response = response['choices'][0]['message']['content']
-        return response
-
-    def get_input_priority(self, attribute_name: str, sample_values: list):
-        response = self.client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant who is an expert machine learning engineer."},
-                {"role": "user", "content": self.input_prompt.format(attribute_name=attribute_name, sample_values=sample_values)}
-            ]
-        )
-        response = response.json()
-        response = json.loads(response)
-        response = response['choices'][0]['message']['content']
-        return response
-    
-    def get_datatype(self, attribute_name: str, sample_values: str):
-        response = self.client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant who is an expert of taxonomy management."},
-                {"role": "user", "content": self.datatype_prompt.format(attribute_name=attribute_name, sample_values=sample_values)}
-            ]
-        )
-        response = response.json()
-        response = json.loads(response)
-        response = response['choices'][0]['message']['content']
-        return response
-
-    def get_ranges(self, attribute_name: str, sample_values: str):
-        response = self.client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant who is an expert of taxonomy management."},
-                {"role": "user", "content": self.ranges_prompt.format(attribute_name=attribute_name, sample_values=sample_values)}
-            ]
-        )
-        response = response.json()
-        response = json.loads(response)
-        response = response['choices'][0]['message']['content']
-        return response
-
-    def get_unit(self, attribute_name: str, sample_values: str):
-        response = self.client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant who is an expert of taxonomy management."},
-                {"role": "user", "content": self.units_prompt.format(attribute_name=attribute_name, sample_values=sample_values)}
-            ]
-        )
-        response = response.json()
-        response = json.loads(response)
-        response = response['choices'][0]['message']['content']
-        return response
-
-    def get_synonyms(self, attribute_name: str, value: str):
-        response = self.client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant who is an expert of English language."},
-                {"role": "user", "content": self.syn_prompt.format(attribute_name=attribute_name, value=value)}
-            ]
-        )
-        response = response.json()
-        response = json.loads(response)
-        response = response['choices'][0]['message']['content']
-        return {
-            'Breadcrumb': attribute_name,
-            'V': value,
-            'Synonyms': response
+    # Function to get metadata using LLM
+    def inference(self, *args):
+        breadcrumb, value, res = args
+        if not pd.isna(res):
+            return res
+        payload = {
+            'attribute': breadcrumb,
+            'values': value
         }
-    
-    def fill_by_llm(self):
-        attributes = self.df[list(self.df.columns)[self.n_levels - 1]].to_list()
-        tasks_meta = {k: v for k, v in zip(attributes, self.df['Classification / Extraction'].to_list()) if not pd.isna(v)}
-        return_type_meta = {k: v for k, v in zip(attributes, self.df['Single Value / Multi Value'].to_list()) if not pd.isna(v)}
-        inputs_meta = {k: v for k, v in zip(attributes, self.df['Input Priority'].to_list()) if not pd.isna(v)}
-        data_type_meta = {k: v for k, v in zip(attributes, self.df['Data Type'].to_list()) if not pd.isna(v)}
-        ranges_meta = {k: v for k, v in zip(attributes, self.df['Ranges'].to_list()) if not pd.isna(v)}
-        units_meta = {k: v for k, v in zip(attributes, self.df['Units'].to_list()) if not pd.isna(v)}
-        res = []
-        for row in tqdm(self.df.to_dict(orient='records'), desc='Processing Records', total=self.df.shape[0]):
-            attribute = list(row.values())[self.n_levels - 1]
-            values = list(row.values())[self.n_levels]
-            if attribute in tasks_meta.keys():
-                row['Classification / Extraction'] = tasks_meta[attribute]
-            else:
-                row['Classification / Extraction'] = self.get_task(attribute_name=attribute, sample_values=values)
-            if attribute in return_type_meta.keys():
-                row['Single Value / Multi Value'] = return_type_meta[attribute]
-            else:
-                row['Single Value / Multi Value'] = self.get_return_type(attribute_name=attribute, sample_values=values)
-            if attribute in inputs_meta.keys():
-                row['Input Priority'] = inputs_meta[attribute]
-            else:
-                row['Input Priority'] = self.get_input_priority(attribute_name=attribute, sample_values=values)
-            if attribute in data_type_meta.keys():
-                row['Data Type'] = data_type_meta[attribute]
-            else:
-                if 'classification' in row['Classification / Extraction'].lower():
-                    row['Data Type'] = 'Enum'
-                else:
-                    row['Data Type'] = self.get_datatype(attribute_name=attribute, sample_values=values)
-            if attribute in ranges_meta.keys():
-                row['Ranges'] = ranges_meta[attribute]
-            else:
-                if row['Data Type'] in ['String', 'Enum']:
-                    row['Ranges'] = 'NA'
-                else:
-                    row['Ranges'] = self.get_ranges(attribute_name=attribute, sample_values=values)
-            if attribute in units_meta.keys():
-                row['Units'] = units_meta[attribute]
-            else:
-                if row['Data Type'] in ['String', 'Enum']:
-                    row['Units'] = 'NA'
-                else:
-                    row['Units'] = self.get_unit(attribute_name=attribute, sample_values=values)
-            res.append(row)
-        res = pd.DataFrame(res)
-        return res
-
-    def __call__(self, strategy: str=None, synonym_policy: int=1):
-        print("Metadata filling has been started!")
-        if strategy:
-            if strategy == 'llm':
-                filled_df = self.fill_by_llm()
-                print("Metadata is filled by LLM!")
-            else:
-                filled_df = self.fill_by_similarity()
-                print("Metdata is filled by similarity search!")
-        else:
-            max_non_missing = 0
-            for col in ['Classification / Extraction', 'Single Value / Multi Value', 'Input Priority']:
-                non_missing_values = self.df.shape[0] - self.df[col].isnull().sum()
-                max_non_missing = max(max_non_missing, non_missing_values)
-            if max_non_missing / self.df.shape[0] >= 0.6:
-                filled_df = self.fill_by_similarity()
-                print("Metadata is filled by similarity search!")
-            else:
-                filled_df = self.fill_by_llm()
-                print("Metdata is filled by LLM!")
-        print("Synonyms searching using LLM has been started!")
-        if synonym_policy == 1:
-            with open(os.path.join('fill_taxonomy', 'prompts', 'synonyms_policy_1.txt')) as fp:
-                self.syn_prompt = fp.read()
-            attributes = filled_df.apply(lambda row: '>'.join([list(row.values)[i].strip() for i in range(self.n_levels) if not pd.isna(list(row.values)[i])]), axis=1)
-            values = filled_df[list(filled_df.columns)[self.n_levels]].to_list()
-            data_types = filled_df['Data Type'].to_list()
-            args = []
-            for attr, value_list, data_type in zip(attributes, values, data_types):
-                if pd.isna(value_list) or data_type == 'Numeric':
-                    continue
-                for value in value_list.split(','):
-                    args.append((attr, value.strip()))
-            with ThreadPoolExecutor(max_workers=16) as executor:
-                res = list(tqdm(executor.map(lambda p: self.get_synonyms(*p), args), desc='Finding Synonyms', total=len(args)))
-            syn_df = pd.DataFrame(res)
-        elif synonym_policy == 2:
-            with open(os.path.join('fill_taxonomy', 'prompts', 'synonyms_policy_2.txt')) as fp:
-                self.syn_prompt = fp.read()
-            attributes = filled_df.apply(lambda row: '>'.join([list(row.values)[i] for i in range(self.n_levels) if not pd.isna(list(row.values)[i])]), axis=1)
-            values = self.df[list(self.df.columns)[self.n_levels]].to_list()
-            data_types = filled_df['Data Type'].to_list()
-            args = []
-            for attr, value, data_type in zip(attributes, values, data_types):
-                if pd.isna(value) or data_type == 'Numeric':
-                    continue
-                args.append((attr, [x.strip() for x in value.split(',')]))
-            with ThreadPoolExecutor(max_workers=16) as executor:
-                res = list(tqdm(executor.map(lambda p: self.get_synonyms(*p), args), desc='Finding Synonyms', total=len(args)))
-            results = []
-            for rec in res: 
-                attr = rec['Attribute']
-                synonyms = rec['Synonyms']
-                if synonyms.startswith('result') or synonyms.startswith('Result'):
-                    synonyms.replace('result', '')
-                synonyms = synonyms.replace("```", '')
-                synonyms = synonyms.strip()
-                for syn_pair in synonyms.split('\n'):
-                    idx = syn_pair.find(':')
-                    word = syn_pair[:idx]
-                    syns = syn_pair[idx+1:].strip()
-                    results.append(
-                        {
-                            'Attribute': attr,
-                            'Word': word,
-                            'Synonyms': syns
-                        }
-                    )
-            syn_df = pd.DataFrame(results)
-        else:
-            raise ValueError("Invalid synonym policy!")
-        print("All tasks are completed!")
-        return filled_df, syn_df
-    
-
-class FillValues:
-    def __init__(self, df: pd.DataFrame):
-        self.df = df
-        self.valid_cols = [re.search(r'\bL\d+\b', x).group() for x in self.df.columns if re.search(r'\bL\d+\b', x)]
-        if 'A' in self.df.columns:
-            self.valid_cols.append('A')
-        else:
-            self.valid_cols.pop()
-        print(self.valid_cols)
-    
-    def get_values(self, attribute_name: str, sample_values: str):
-        response = self.client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant who is an expert of taxonomy management."},
-                {"role": "user", "content": self.datatype_prompt.format(attribute_name=attribute_name, sample_values=sample_values)}
-            ]
-        )
-        response = response.json()
-        response = json.loads(response)
-        response = response['choices'][0]['message']['content']
+        response = self.client(**payload)
         return response
 
+    # Fill metadata using LLM
+    def fill_by_llm(self, df: pd.DataFrame):
+        for col in tqdm(self.metadata.keys(), desc='Generating Metdata', total=len(self.metadata)):
+            if col in ['Data Type', 'Ranges', 'Units']:
+                if col == 'Data Type':
+                    df[col] = df['Classification / Extraction'].apply(lambda x: 'Enum' if x == 'Classification' else np.nan)
+                else:
+                    df[col] = df['Classification / Extraction'].apply(lambda x: 'NA' if x == 'Classification' else np.nan)
+            self.client = MetaChatGPT(model_name='gpt-4o-mini', data_type='text', prompt_path=self.metadata[col])
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                df[col] = list(executor.map(lambda row: self.inference(row['breadcrumb'], row['V'], row[col]), df.to_dict(orient='records')))
+        df.drop(columns='breadcrumb', inplace=True)
+        return df
+
+    # Menu driven function
+    def __call__(self, df: pd.DataFrame):
+        # Assign all metadata column by NaN values
+        for col in self.metadata:
+            if col not in list(df.columns):
+                self.df[col] = np.nan
+        # Get valid cols and create breadcrumb
+        valid_cols = [re.search(r'\bL\d+\b', x).group() for x in df.columns if re.search(r'\bL\d+\b', x)]
+        valid_cols.append('A')
+        df['breadcrumb'] = df.apply(lambda row: ' > '.join([row[col] for col in valid_cols if not pd.isna(row[col])]), axis=1)
+        # Fill the missing values
+        return self.fill_by_llm(df)
+        
+        
+
+'''
+Definition: The class can fill synonyms when taxonomy and attribute values are given.
+'''
+class FindSynonyms:
+    # Constructor
+    def __init__(self):
+        self.client = None
+
+    # Get synonyms using ChatGPT
+    def get_synonyms(self, *args):
+        taxonomy, attribute, value, note = args
+        if note:
+            payload = {
+                'taxonomy': taxonomy,
+                'attribute': attribute,
+                'value': value,
+                'note': note
+            }
+        else:
+            payload = {
+                'taxonomy': taxonomy,
+                'attribute': attribute,
+                'value': value
+            }
+        response = self.client(**payload)
+        return {
+            'Breadcrumb': taxonomy + ' > ' + attribute,
+            'V': value,
+            'Synonyms': response 
+        }   
+    
+    # Recall based policy: Policy 1
+    def policy_1(self, df: pd.DataFrame, note: str = None):
+        levels = [re.search(r'\bL\d+\b', x).group() for x in df.columns if re.search(r'\bL\d+\b', x)]
+        taxonomy = df.apply(lambda row: ' > '.join([row[x] for x in levels if not pd.isna(row[x])]), axis=1).to_list()
+        attributes = df['A'].to_list()
+        values = df['V'].to_list()
+        data_types = df['Data Type'].to_list()
+        args = []
+        for tax, attr, value_list, data_type in zip(taxonomy, attributes, values, data_types):
+            if pd.isna(value_list) or data_type == 'Numeric':
+                continue
+            for value in value_list.split(','):
+                if value.lower().strip() == 'others' or value.lower().strip() == 'other':
+                    continue
+                args.append((tax, attr, value.strip(), note))
+        with ThreadPoolExecutor(max_workers=16) as executor:
+            res = list(tqdm(executor.map(lambda p: self.get_synonyms(*p), args), desc='Finding Synonyms', total=len(args)))
+        return pd.DataFrame(res)
+    
+    # Relevance based policy: Policy 2
+    def policy_2(self, df: pd.DataFrame, note: str = None):
+        levels = [re.search(r'\bL\d+\b', x).group() for x in df.columns if re.search(r'\bL\d+\b', x)]
+        taxonomy = df.apply(lambda row: ' > '.join([row[x] for x in levels if not pd.isna(row[x])]), axis=1).to_list()
+        attributes = df['A'].to_list()
+        values = df['V'].to_list()
+        data_types = df['Data Type'].to_list()
+        args = []
+        for tax, attr, value, data_type in zip(taxonomy, attributes, values, data_types):
+            if pd.isna(value) or data_type == 'Numeric':
+                continue
+            args.append((tax, attr, [x.strip() for x in value.split(',') if x.lower().strip()!='others' and x.lower().strip()!='other'], note))
+        with ThreadPoolExecutor(max_workers=16) as executor:
+                res = list(tqdm(executor.map(lambda p: self.get_synonyms(*p), args), desc='Finding Synonyms', total=len(args)))
+        results = []
+        for rec in res: 
+            breadcrumb = rec['Breadcrumb']
+            synonyms = rec['Synonyms']
+            if synonyms.startswith('result') or synonyms.startswith('Result'):
+                synonyms.replace('result', '')
+            synonyms = synonyms.replace("```", '')
+            synonyms = synonyms.strip()
+            for syn_pair in synonyms.split('\n'):
+                idx = syn_pair.find(':')
+                word = syn_pair[:idx]
+                syns = syn_pair[idx+1:].strip()
+                results.append(
+                    {
+                        'Breadcrumb': breadcrumb,
+                        'V': word,
+                        'Synonyms': syns
+                    }
+                )
+        return pd.DataFrame(results)
+
+    # Main function call
+    def __call__(self, df: pd.DataFrame, policy: int = 2, prompt_path: str='prompts/synonyms_policy_2.txt', note: str = None):
+        if policy == 1:
+            if note:
+                prompt_path = 'prompts/synonyms_dynamic_policy_1.txt'
+            else:
+                prompt_path = 'prompts/synonyms_policy_1.txt'
+        elif policy == 2:
+            if note:
+                prompt_path = 'prompts/synonyms_dynamic_policy_2.txt'
+            else:
+                prompt_path = 'prompts/synonyms_policy_2.txt'
+        else:
+            raise ValueError("Invalid synonyms policy!")
+        self.client = MetaChatGPT(model_name='gpt-4o-mini', data_type='text', prompt_path=prompt_path)
+        if policy == 1:
+            return self.policy_1(df, note)
+        elif policy == 2:
+            return self.policy_2(df, note)
+        else:
+            raise ValueError("Invalid policy for synonyms!")
+
+
+            
+
+'''
+Definition: The class can create attributes from a given breadcrumb.
+'''
+class FillAttributes:
+    # Constructor
+    def __init__(self):
+        self.client = None
+    
+    # Create hirearchy from the levels and attributes of the given dataframe
+    def create_hierarchy(self, df: pd.DataFrame, valid_cols: list):
+        res = []
+        for row in df.to_dict(orient='records'):
+            temp = ''
+            for col in valid_cols:
+                if not pd.isna(col):
+                    temp = temp + ' > ' + col
+            row['hierarchy'] = temp
+        res.append(row)
+        df = pd.DataFrame(res)
+        return df
+    
+    # Values using ChatGPT
+    def inference(self, hierarchy: str, note: str = None):
+        taxonomy, category = ' > '.join(hierarchy.split(' > ')[:-1]), hierarchy.split(' > ')[-1]
+        if note:
+            payload = {
+                'taxonomy': taxonomy,
+                'category': category,
+                'note': note
+            }
+        else:
+            payload = {
+                'taxonomy': taxonomy,
+                'category': category
+            }
+        response = self.client(**payload)
+        return response
+    
+    # Get the values of each attribute
+    def get_attributes(self, row: dict):
+        # If values are already filled then ignore it
+        if not pd.isna(row['A']):
+            return row['A']
+        else:
+            if 'note' in list(row.keys()):
+                return self.inference(row['hierarchy'], row['note'])
+            else:
+                return self.inference(row['hierarchy'])
+    
+    # Function to get attributes for a single input    
+    @staticmethod
+    def get(hierarchy: str, prompt_path: str = 'prompts/fill_attributes.txt', note: str = None):
+        if note:
+            prompt_path = 'prompts/fill_attributes_dynamic.txt'
+        client = MetaChatGPT(
+            model_name='gpt-4o-mini',
+            data_type='text',
+            prompt_path=prompt_path
+        )
+        taxonomy, category = ' > '.join(hierarchy.split(' > ')[:-1]), hierarchy.split(' > ')[-1]
+        if note:
+            payload = {
+                'taxonomy': taxonomy,
+                'category': category,
+                'note': note
+            }
+        else:
+            payload = {
+                'taxonomy': taxonomy,
+                'category': category
+            }
+        response = client(**payload)
+        return response
+    
+    # Postprocessing of the final result
+    def postprocessing(self, df: pd.DataFrame):
+        res = []
+        for row in df.to_dict(orient='records'):
+            attrs = [a.strip() for a in row['A'].split(',')]
+            for a in attrs:
+                temp = row.copy()
+                temp['A'] = a
+                res.append(temp)
+        res = pd.DataFrame(res)
+        return res
+    
+    # Main function call 
+    def __call__(self, df: pd.DataFrame, prompt_path: str = 'prompts/fill_attributes.txt', note: str = None):
+        # Get all the valid cols, valid cols are levels
+        valid_cols = [re.search(r'\bL\d+\b', x).group() for x in df.columns if re.search(r'\bL\d+\b', x)]
+        # Create the prompt path
+        if note:
+            prompt_path = 'prompts/fill_attributes_dynamic.txt'
+        # Create a ChatGPt clinet which will be used for generating repsonse
+        self.client = MetaChatGPT(
+            model_name='gpt-4o-mini',
+            data_type='text',
+            prompt_path=prompt_path
+        )
+        # Create the hierarchy for getting values
+        df['hierarchy'] = df.apply(lambda row: ' > '.join([row[col] for col in valid_cols if not pd.isna(row[col])]), axis=1)
+        # Add note to dataframe if given
+        if note:
+            df['note'] = note
+        # Get the values of each attribute
+        with ThreadPoolExecutor(max_workers=16) as executor:
+            res = list(tqdm(executor.map(lambda p: self.get_attributes(p), df.to_dict(orient='records')), desc='Finding Values', total=df.shape[0]))
+        # Return the values after postprocessing
+        df['A'] = res
+        if note:
+            df.drop(columns=['hierarchy', 'note'], inplace=True)
+        else:
+            df.drop(columns='hierarchy', inplace=True)
+        df = self.postprocessing(df)
+        return df
+
+
+
+'''
+Definition: The class can create values from a given breadcrumb and it's attribute.
+'''
+class FillValues:
+    # Constructor
+    def __init__(self):
+        self.client = None
+    
+    # Create hirearchy from the levels and attributes of the given dataframe
+    def create_hierarchy(self, df: pd.DataFrame, valid_cols: list):
+        res = []
+        for row in df.to_dict(orient='records'):
+            temp = ''
+            for col in valid_cols:
+                if not pd.isna(col):
+                    temp = temp + ' > ' + col
+            row['hierarchy'] = temp
+        res.append(row)
+        df = pd.DataFrame(res)
+        return df
+    
+    # Values using ChatGPT
+    def inference(self, hierarchy: str, note: str = None):
+        taxonomy, attribute = ' > '.join(hierarchy.split(' > ')[:-1]), hierarchy.split(' > ')[-1]
+        if note:
+            payload = {
+                'taxonomy': taxonomy,
+                'attribute': attribute,
+                'note': note
+            }
+        else:
+            payload = {
+                'taxonomy': taxonomy,
+                'attribute': attribute,
+            }
+        response = self.client(**payload)
+        return response
+    
+    # Get the values of each attribute
+    def get_values(self, row: dict):
+        # If values are already filled then ignore it
+        if not pd.isna(row['V']):
+            return row['V']
+        else:
+            if 'note' in list(row.keys()):
+                return self.inference(row['hierarchy'], row['note'])
+            else:
+                return self.inference(row['hierarchy'])
+    
+    # Function to get values for a single input
+    @staticmethod
+    def get(hierarchy: str, prompt_path: str = 'prompts/fill_values.txt', note: str = None):
+        if note:
+            prompt_path = 'prompts/fill_values_dynamic.txt'
+        client = MetaChatGPT(
+            model_name='gpt-4o-mini',
+            data_type='text',
+            prompt_path=prompt_path
+        )
+        taxonomy, attribute = ' > '.join(hierarchy.split(' > ')[:-1]), hierarchy.split(' > ')[-1]
+        if note:
+            payload = {
+                'taxonomy': taxonomy,
+                'attribute': attribute,
+                'note': note
+            }
+        else:
+            payload = {
+                'taxonomy': taxonomy,
+                'attribute': attribute
+            }
+        response = client(**payload)
+        return response
+    
+    # Main function call 
+    def __call__(self, df: pd.DataFrame, prompt_path: str = 'prompts/fill_values.txt', note: str = None):
+        # Get all the valid cols, valid cols are levels and 'A' which stand for attribute
+        valid_cols = [re.search(r'\bL\d+\b', x).group() for x in df.columns if re.search(r'\bL\d+\b', x)]
+        valid_cols.append('A')
+        # Crate the prompt path
+        if note:
+            prompt_path = 'prompts/fill_values_dynamic.txt'
+        # Create a ChatGPt clinet which will be used for generating repsonse
+        self.client = MetaChatGPT(
+            model_name='gpt-4o-mini',
+            data_type='text',
+            prompt_path=prompt_path
+        )
+        # Create the hierarchy for getting values
+        df['hierarchy'] = df.apply(lambda row: ' > '.join([row[col] for col in valid_cols if not pd.isna(row[col])]), axis=1)
+        # Assign note if given
+        if note:
+            df['note'] = note
+        # Get the values of each attribute
+        with ThreadPoolExecutor(max_workers=16) as executor:
+            res = list(tqdm(executor.map(lambda p: self.get_values(p), df.to_dict(orient='records')), desc='Finding Values', total=df.shape[0]))
+        df['V'] = res
+        if note:
+            df.drop(columns=['hierarchy', 'note'], inplace=True)
+        else:
+            df.drop(columns='hierarchy', inplace=True)
+        return df

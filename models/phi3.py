@@ -1,4 +1,5 @@
 # Import libraries
+import os
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
@@ -7,13 +8,17 @@ Phi3 wrapper to use it as agent in workflow
 '''
 class Phi3:
     def __init__(self):
+        cache_dir = os.path.join('hf_models', 'phi3')
+        os.makedirs(cache_dir, exist_ok=True)
         self.tokenizer = AutoTokenizer.from_pretrained(
             "microsoft/Phi-3-mini-4k-instruct", 
+            cache_dir=cache_dir,
             trust_remote_code=True, 
             device_map='cuda'
         )
         self.model = AutoModelForCausalLM.from_pretrained(
             "microsoft/Phi-3-mini-4k-instruct", 
+            cache_dir=cache_dir,
             trust_remote_code=True, 
             device_map='cuda'
         )
@@ -31,5 +36,5 @@ class Phi3:
             formatted_prompt = prompt.format(context=context)
         inputs = self.tokenizer.apply_chat_template(formatted_prompt, add_generation_prompt=True, return_tensors="pt").to('cuda')
         outputs = self.model.generate(inputs, max_new_tokens=max_new_tokens)
-        text = self.tokenizer.batch_decode(outputs)[0]
-        return self.post_processing(text)
+        gen_text = self.tokenizer.batch_decode(outputs)[0]
+        return self.post_processing(gen_text)
