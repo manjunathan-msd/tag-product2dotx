@@ -12,7 +12,7 @@ from taxonomy_builder.utils import TaxonomyTree, TaxonomyNode
 class Tagger2dotX:
     def __init__(self, config_path='configs.yaml', taxonomy_df=None,taxonomy_depth=5, agent=None, use_meta=True):
         self.configs = self.load_config(config_path)
-        self.taxonomy_df = taxonomy_df or self.load_default_taxonomy()
+        self.taxonomy_df = taxonomy_df if taxonomy_df is not None else self.load_default_taxonomy()
         self.taxonomy_depth=taxonomy_depth
         self.taxonomy = self.create_taxonomy_tree()
         self.agent = agent or inference_by_chatgpt
@@ -45,6 +45,7 @@ class Tagger2dotX:
     
     def create_taxonomy_tree(self):
         tree = TaxonomyTree()
+        print(self.taxonomy_df)
         tree(self.taxonomy_df)
         return tree
 
@@ -87,17 +88,22 @@ class Tagger2dotX:
             tic(self.timing_dict, f"L{depth}")
             
             child_labels = [child.get_name().split('>')[-1] for child in current_node.get_children()]
-            res = self.agent(context=context, prompt=self.classification_prompt, image_path=image_path, tax_vals=",".join(child_labels))
-            
-            chosen_child = self.match_response_to_child(res, current_node.get_children())
-            
-            if chosen_child:
-                classification_result[f"L{depth}"] = chosen_child.get_name().split('>')[-1]
-                current_node = chosen_child
+            if len(child_labels) == 1:
+                classification_result[f"L{depth}"] = child_labels[0]
+                chosen_child = current_node.get_children()[0]
+                current_node=chosen_child
             else:
-                classification_result[f"L{depth}"] = "Not Specified"
-                break
-            
+                res = self.agent(context=context, prompt=self.classification_prompt, image_path=image_path, tax_vals=",".join(child_labels))
+                
+                chosen_child = self.match_response_to_child(res, current_node.get_children())
+                
+                if chosen_child:
+                    classification_result[f"L{depth}"] = chosen_child.get_name().split('>')[-1]
+                    current_node = chosen_child
+                else:
+                    classification_result[f"L{depth}"] = "Not Specified"
+                    break
+                
             toc(self.timing_dict, f"L{depth}")
             depth += 1
 
@@ -117,11 +123,12 @@ class Tagger2dotX:
                     }
                 else:
                     taxonomy_schema[attribute_name] = attribute_values
+
             tic(self.timing_dict, f"L{depth}")
-            res = self.agent(context=context, prompt=self.attribute_prompt, image_path=image_path, tax_vals=taxonomy_schema)
+            # res = self.agent(context=context, prompt=self.attribute_prompt, image_path=image_path, tax_vals=taxonomy_schema)
+            res = self.agent(context=context, image_url=image_path)
             classification_result[f"L{depth}"] = res
             toc(self.timing_dict, f"L{depth}")
-
         return classification_result
 
     def __call__(self, record):
@@ -141,16 +148,18 @@ class Tagger2dotX:
         
         context = "\n".join(context_parts)
         
-        image_path = check_cache(image_url=record['image url'])
+        # image_path = check_cache(image_url=record['image url'])
         
         try:
-            standard_output = self.traverse_tree_and_classify(context=context, image_path=image_path)
-            custom_output = self.agent(context=context, image_path=image_path, prompt=self.custom_prompt)
+            # standard_output = self.traverse_tree_and_classify(context=context, image_path=image_path)
+            standard_output = self.traverse_tree_and_classify(context=context, image_path=record['image url'])
+            # print(standard_output)
+            # custom_output = self.agent(context=context, image_path=image_path, prompt=self.custom_prompt)
             
             return {
-                'Standard Output': json.dumps(standard_output, indent=4),
-                'Custom Output': json.dumps(custom_output, indent=4)
+                'Standard Output': json.dumps(standard_output, indent=4)
+                # 'Custom Output': json.dumps(custom_output, indent=4)
             }
         except Exception as e:
             print(f"Error processing record: {str(e)}")
-            return {'Standard_Output': None, 'Custom_Output': None}
+            return {'Standard Output': None, 'Custom Output': None}
