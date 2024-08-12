@@ -1,6 +1,14 @@
 import pandas as pd
+#Models
+from models.gpt_model import inference_by_chatgpt
+from models.hpt_model import HPT
+#Tagger
 from tagger.tagger import Tagger2dotX
 from utils.postprocess_utils import convert_demosite_format
+
+#Initializing Model:
+agent_llm=HPT()
+
 classifier=Tagger2dotX(use_meta=True)
 
 def apply_classifier(row):

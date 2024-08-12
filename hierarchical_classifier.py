@@ -11,6 +11,7 @@ from tqdm import tqdm
 sys.path.append('/home/ubuntu/miniconda3/envs/dev/lib/python3.10/site-packages')
 from fuzzywuzzy import fuzz
 from models.gpt_model import inference_by_chatgpt
+from models.hpt_model import HPT
 from utils.image_utils import check_cache
 from utils.timer_utils import tic, toc
 from utils.postprocess_utils import convert_demosite_format

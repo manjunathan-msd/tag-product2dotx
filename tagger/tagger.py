@@ -4,18 +4,18 @@ import yaml
 import pandas as pd
 from tqdm import tqdm
 from fuzzywuzzy import fuzz
-from models.gpt_model import inference_by_chatgpt
 from utils.image_utils import check_cache
 from utils.timer_utils import tic, toc
 from taxonomy_builder.utils import TaxonomyTree, TaxonomyNode
 
 class Tagger2dotX:
     def __init__(self, config_path='configs.yaml', taxonomy_df=None,taxonomy_depth=5, agent=None, use_meta=True):
+        assert agent is not None, "Agent isn't given"
         self.configs = self.load_config(config_path)
         self.taxonomy_df = taxonomy_df or self.load_default_taxonomy()
         self.taxonomy_depth=taxonomy_depth
         self.taxonomy = self.create_taxonomy_tree()
-        self.agent = agent or inference_by_chatgpt
+        self.agent = agent
         self.classification_prompt = self.load_prompt(self.configs['prompt_path_0'])
         self.attribute_prompt = self.load_prompt(self.configs['prompt_path_1'])
         self.custom_prompt = self.load_prompt(self.configs['custom_prompt_path'])
@@ -31,6 +31,7 @@ class Tagger2dotX:
             return fp.read()
 
     def load_default_taxonomy(self):
+        print("No Taxonomy Given - Loading Default Taxonomy")
         categories = ["Fashion", "Accessories", "Beauty", "Electronics", "Home"]
         df = pd.DataFrame()
         for category in categories:

@@ -33,7 +33,7 @@ cd HPT || exit
 # Create and activate a new Conda environment
 ENV_NAME="hpt_env"
 conda create -n "$ENV_NAME" python=3.10 -y
-source activate "$ENV_NAME"
+conda activate "$ENV_NAME"
 
 # Install requirements
 pip install -r requirements.txt
