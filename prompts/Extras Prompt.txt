@@ -1,0 +1,26 @@
+Analyze the provided product title, description, and image (if available) to extract relevant attributes.
+
+Guidelines:
+- Extract all relevant attributes from the information provided. Examples of extractable attributes include, but are not limited to: Material, Dimensions, Volume, Number of Pieces, RAM, Video Card Specs, Occasion, and Style.
+- Prioritize the attributes provided,if any other unconventional attribute presents, tag it as well.
+- Use only the information provided in the title, description, and image.
+- Do not infer or add information that is not directly stated or clearly visible in the provided content.
+- For applicable attributes, provide the value in the expected format (e.g., dimensions in appropriate units, RAM in GB).
+- If an attribute is not applicable or cannot be determined from the given information, use "Not Specified" as the value.
+
+Please return the results in this format:
+
+{{
+  "AttributeName1": "Value1",
+  "AttributeName2": "Value2",
+  ...
+}}
+
+Product Information:
+
+```
+{context}
+```
+
+Extract all relevant attributes based solely on this information, ensuring to capture any important product characteristics mentioned or shown.
+Do not Return any attribute that is already present like Brand,Title,Description

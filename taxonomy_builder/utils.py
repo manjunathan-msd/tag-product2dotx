@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 
 
-
 # Node of the taxonomy tree
 class TaxonomyNode:
     def __init__(self, name: str, input_priority: str, labels: str = None, task: str = None, return_type: str = None, 
@@ -94,6 +93,15 @@ class TaxonomyNode:
         return f"Name: {self.name}\nTask Type: {self.task}\nLabels: {self.labels}\nReturn Type: {self.return_type}\nInput Type: {self.input_priority}\n" \
                f"Data Type: {self.data_type}\nRanges: {self.ranges}\nUnits: {self.units}\nNode Type: {self.node_type}\nChildren: {children_name}\n====================\n"
 
+# Node of the taxonomy tree
+class TaxonomyNode2:
+    # Constructor
+    def __init__(self, name: str, input_priority: str, metdata: dict):
+        self.name = name
+        self.input_priority = input_priority
+        self.metadata = metdata
+        self.
+    
 
 
 # Convert the taxonomy to a tree like structure

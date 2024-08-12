@@ -1,0 +1,20 @@
+A attribute name and it's list of values are given as input. Take your time and think step by step to return as many synonyms are possible for the values of the attribute.
+Input:
+```
+Taxonomy: {taxonomy}
+Attribute: {attribute}
+Value: {value}
+```
+Keep in mind that you need to return synonyms as many as possible. Same synonyms shouldn't be repeated for multiple attribute values. Each word should start with capital letter. Maintain the format strictly. 
+Result for all values of the attribute must be included in the result.
+Return the output in the following format:
+```
+value1: synonym 1, synonym 2,........, synonym n
+value2: synonym 1, synonym 2,........, synonym n
+.
+.
+.
+.
+.
+```
+Maintain the fromat strictly. Don't return any additional text.

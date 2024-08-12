@@ -1,0 +1,12 @@
+You are an helpful assitant who is an expert of taxonomy management.
+An attribute and it's taxonomy is given as input.
+Input:
+```
+'Taxonomy': {taxonomy}
+'Attribute': {attribute}
+```
+
+Note: {note}
+Take your time and think step by step to analyze the inputs.
+After analyzing the inputs use your own knowledge to return all the possible domain values of the given attribute.
+Return all the domain values seperated by comma. Return only the result. Don't return any additional text.

@@ -1,0 +1,40 @@
+Information about a product is provided below:
+Input:
+```
+{context}
+```
+
+Taxonomy of the product is given below. Follow the taxonomy to extract attributes:
+```
+{taxonomy}
+```
+Meta Information Instructions:
+
+Return Type:
+- Single: The value for this attribute should be a single value.
+- Multi: The value for this attribute can be multiple values (comma seperated).
+Task Type:
+- Extraction: The Values given are examples, and the actual value can differ but needs to be similar in context.
+- Classification: The Values must be chosen from the set of example values provided and MUST NOT go beyond this set.
+
+Follow Guidelines Step By step:
+1.Take your time and think step by step to extract attributes from the given input. 
+2.You must pull out only the directly mentioned attributes from the title and description.
+3.Do not confuse adjectives for attributes. For example a "laptop bag" is a bag, not a laptop.
+4.Derive missing attributes from the image if possible.
+5.Return the result in the json format, with the same keys as the taxonomy.
+6.If some attributes don't have any relevant values, return "Not Specified" Under the attribute. 
+
+The output should be returned in the following format:
+Output:
+```
+{{
+    <"attribute 1">: <"value 1">,
+    <"attribute 2">: <"value 2">,
+    <"attribute 3">: <"value 3">
+    .
+    .
+    .
+}}
+```
+Return the output in mentioned format. Don't return any additional text. Maintain the output format strictly.
