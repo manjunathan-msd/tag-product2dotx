@@ -4,8 +4,8 @@ model:
     max_new_tokens: 512
 classification:
   non_leaf_classification_prompt_path: prompts/non_leaf_classification.txt
-  leaf_classification_prompt_path: 
+  leaf_classification_prompt_path: prompts/leaf_classification.txt
 extraction:
   mode: 'leaf'
-  extraction_prompt_path: 
+  extraction_prompt_path: prompts/non_leaf_extraction.txt
   

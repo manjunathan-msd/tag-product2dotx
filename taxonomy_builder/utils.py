@@ -121,11 +121,12 @@ class TaxonomyTree:
         if len(root.get('children')) == 0:
             root.add('node_type', 'attribute')
             return
-        if root.get('name') == 'root':
-            root.add('labels', [children.get('name').split(' > ')[-1] for children in root.get('children')])
-            root.add('node_type', 'NA')
-            for x in metadata_names:
-                root.add(x, 'NA')
+        # elif root.get('name') == 'root':
+        #     root.add('labels', [children.get('name').split(' > ')[-1] for children in root.get('children')])
+        #     root.add('Classificatio')
+        #     root.add('node_type', 'category')
+        #     for x in metadata_names:
+        #         root.add(x, 'NA')
         elif root.get('Classification / Extraction') == 'NA':
             pass
         else:
