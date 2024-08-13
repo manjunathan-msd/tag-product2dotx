@@ -1,0 +1,12 @@
+Information of a Product is Provided Below:
+Input:
+```
+{context}
+```
+
+Take your time and think step by step to get the category of the product.
+Category of the product must be one of the following categories mentioned below. Do not do a simple keyword extraction, pay attention to the wording and the image
+{taxonomy}
+
+If the product cannot be classified in any of the mentioned categories then return "Not specified".
+Return only the result. Don't return any additional text.
