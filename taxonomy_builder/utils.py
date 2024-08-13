@@ -28,6 +28,10 @@ class TaxonomyNode:
             return self.labels
         elif x == 'node_type':    
             return self.node_type
+        elif x == 'metadata':
+            if len(self.synonyms) > 0:
+                self.metadata['Synonyms'] = self.synonyms
+            return self.metadata
         else:
             return self.metadata[x]
     
@@ -63,6 +67,12 @@ class TaxonomyTree:
         self.n_levels = None
         self.root = TaxonomyNode(name='root')
         self.res = ''
+        
+    def get(self, x):
+        if x == 'root':
+            return self.root
+        else:
+            raise ValueError("Unspported parameter!")
     
     @staticmethod
     def preorder(root):

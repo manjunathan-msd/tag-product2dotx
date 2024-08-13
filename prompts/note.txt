@@ -1,5 +1,12 @@
-Classification / Extractioon:
+Classification / Extraction:
     - Classification: Output should be predicted from the given labels. If not mactch is found amoung the given labels then 'Not specified' should bre returned.
     - Extraction: Anything relevant to the question can be predicted.
 
-Single L
+Single Value / Multi Value:
+    - Single Value: Only one label should be returned as result.
+    - Multi Value: Multiple labels can be returned as result.
+
+Input Priority:
+    Image: Image should be priotized more rather than text.
+    Text: Text shoudl be priotized more rather than image.
+    Image, Text: Image and Text both should be priotized equally.

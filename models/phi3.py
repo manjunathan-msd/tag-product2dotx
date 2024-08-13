@@ -1,6 +1,6 @@
 # Import libraries
 import os
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
 
 '''
@@ -10,28 +10,37 @@ class Phi3:
     def __init__(self, max_new_tokens: int = 256):
         cache_dir = os.path.join('pretrained_models', 'phi3')
         os.makedirs(cache_dir, exist_ok=True)
-        self.tokenizer = AutoTokenizer.from_pretrained(
+        # Declare tokenizer, model and model
+        tokenizer = AutoTokenizer.from_pretrained(
             "microsoft/Phi-3-mini-4k-instruct", 
             cache_dir=cache_dir,
             trust_remote_code=True, 
             device_map='cuda'
         )
-        self.model = AutoModelForCausalLM.from_pretrained(
+        model = AutoModelForCausalLM.from_pretrained(
             "microsoft/Phi-3-mini-4k-instruct", 
             cache_dir=cache_dir,
             trust_remote_code=True, 
-            device_map='cuda'
+            device_map='cuda',
+            torch_dtype='auto'
         )
-        self.max_new_tokens = max_new_tokens
-
-    def post_processing(self, text: str):
-        idx = text.find('<|assistant|>')
-        text = text[idx:]
-        text = text.replace('<|assistant|>', '').replace('<|end|>', '').strip()
-        return text
+        self.pipeline = pipeline( 
+            "text-generation", 
+            model=model, 
+            tokenizer=tokenizer, 
+        )
+        # Define generation configurations
+        self.generation_args = { 
+            "max_new_tokens": max_new_tokens, 
+            "return_full_text": False, 
+            "temperature": 0.0, 
+            "do_sample": False, 
+        } 
 
     def __call__(self, prompt: str, image_url: str):
-        inputs = self.tokenizer.apply_chat_template(prompt, add_generation_prompt=True, return_tensors="pt").to('cuda')
-        outputs = self.model.generate(inputs, max_new_tokens=self.max_new_tokens)
-        gen_text = self.tokenizer.batch_decode(outputs)[0]
-        return self.post_processing(gen_text)
+        messages = [ 
+            {"role": "system", "content": "You are a helpful assistant who is an expert of inventory management."}, 
+            {"role": "user", "content": prompt}, 
+        ]
+        gen_text = self.pipeline(messages, **self.generation_args)[0]['generated_text'].strip()
+        return gen_text

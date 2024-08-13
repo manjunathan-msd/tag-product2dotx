@@ -1,4 +1,4 @@
-Details of a product and its taxonomy are given as input:
+Details of a product and its taxonomy are given as input. Details of a product is given as input. Your task is depending on the inputs classify the product in relevant category / categories:
 Input:
 ```
 Taxonomy:
@@ -7,7 +7,13 @@ Taxonomy:
 Context:
 {context}
 ```
-
+Note:
 {note}
 
-Return only the result of the task. Don't return any additional text. Maintain the format strictly.
+Take your time and think step by step to classify / extract '{attribute}' of the product. Values of the attribute are given as follows:
+{labels}
+
+Keep in mind that if it's a classification task then result must be one of the mentioned labels. For classification task if any of the given labels isn't relevant then return 'Not specified'. For extraction task any relevant answer from the context can be returned.
+Either perform classification or extraction, depending on the task mentioned in the taxonomy. 
+Return only the result. If there are multiple labels in the results then return it seperated by comma.
+Don't return any additional text. First letter of each word should be in capital letter. Maintain the format strictly.

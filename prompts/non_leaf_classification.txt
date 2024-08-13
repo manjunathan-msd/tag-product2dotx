@@ -1,4 +1,4 @@
-Details of a product is given as input:
+Details of a product is given as input. Your task is depending on the inputs classify the product in one of the relevant category:
 Input:
 ```
 {context}
@@ -7,4 +7,5 @@ Input:
 Take your time and think step by step to classify the product among one of the following categories. Categories are defined as follows:
 {labels}
 
+If the product can't be classified in any of the following categories then retun 'Not specified'.
 Return only the catgory of the product. Don't return additional text. Maintain the format strictly.
