@@ -5,7 +5,6 @@ from concurrent.futures import ThreadPoolExecutor
 import re
 import numpy as np
 import pandas as pd
-from sklearn.metrics.pairwise import cosine_similarity
 from tqdm import tqdm
 from models.chatgpt import MetaChatGPT
 
@@ -60,7 +59,7 @@ class FillMetadata:
         # Assign all metadata column by NaN values
         for col in self.metadata:
             if col not in list(df.columns):
-                self.df[col] = np.nan
+                df[col] = np.nan
         # Get valid cols and create breadcrumb
         valid_cols = [re.search(r'\bL\d+\b', x).group() for x in df.columns if re.search(r'\bL\d+\b', x)]
         valid_cols.append('A')
