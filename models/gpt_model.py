@@ -13,36 +13,25 @@ import time
 #Timeout Check Class- to avoid stuck vals
 from functools import wraps
 import signal
+import boto3
 
-from dotenv import load_dotenv
-load_dotenv()
-openai_api_key = os.getenv("OPENAI_API_KEY")
+secret_name = "tag-taxonomy-gpt-4o"
+region_name = "us-east-1"
+session = boto3.session.Session()
+client = session.client(
+    service_name='secretsmanager',
+    region_name=region_name
+)
+get_secret_value_response = client.get_secret_value(
+    SecretId=secret_name
+)
+secret = get_secret_value_response['SecretString']
+secret_obj = json.loads(secret)
 
-# Use the API key in your code
-print(f"Your OpenAI API key is: {openai_api_key}")
 
 
-class TimeoutError(Exception):
-    pass
+openai_client = OpenAI(api_key=secret_obj.get("api_key",""))
 
-def timeout(seconds=10, error_message="Function call timed out"):
-    def decorator(func):
-        def _handle_timeout(signum, frame):
-            raise TimeoutError(error_message)
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            signal.signal(signal.SIGALRM, _handle_timeout)
-            signal.alarm(seconds)
-            try:
-                result = func(*args, **kwargs)
-            finally:
-                signal.alarm(0)
-            return result
-        return wrapper
-    return decorator
-
-openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Resize and encode image
 def encode_image(image_path: str):
@@ -55,7 +44,7 @@ def encode_image(image_path: str):
     img_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
     return img_base64
 
-@timeout(20)
+
 def inference_by_chatgpt(context: str, image_path: str, prompt: str, tax_vals: str = None):
     try:
         if tax_vals:
@@ -66,7 +55,7 @@ def inference_by_chatgpt(context: str, image_path: str, prompt: str, tax_vals: s
         image_str = encode_image(image_path)
         headers = {
           "Content-Type": "application/json",
-          "Authorization": f"Bearer {openai_api_key}"
+          "Authorization": f"Bearer {secret_obj.get('api_key','')}"
         }
         payload = {
           "model": "gpt-4o",
@@ -89,7 +78,7 @@ def inference_by_chatgpt(context: str, image_path: str, prompt: str, tax_vals: s
             }
           ]
         }
-        response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload, timeout=15)  # 9 seconds timeout for the request
+        response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload, timeout=15)  # 15 seconds timeout for the request
         # print("Response:",response.text)
         response = response.json()
         response = response['choices'][0]['message']['content']
