@@ -10,10 +10,18 @@ The class can tag data when a TaxonomyTree and data is given
 class Tagger:
     def __init__(self, taxonomy: TaxonomyTree, **configs):
         self.taxonomy = taxonomy
-        if configs['model_name'] == 'phi3':
-            self.model = Phi3()
-        self.mode = configs['mode']
-        self.prompt_paths = {}
+        if configs['model']['name'] == 'phi3':
+            if len(configs['model']['parameters']):
+                self.model = Phi3(**configs['model']['parameters'])
+            else:
+                self.model = Phi3()
+        self.mode = configs['extraction']['mode']
+        # Read prompts
+        self.prompts = {}
+        with open(configs['classification']['non_leaf_classification_prompt_path']) as fp:
+            self.prompts['non_leaf_classification_prompt'] = fp.read()
+        with open(configs['classification']['leaf_classification_prompt_path']) as fp:
+            self.prompts['leaf_classification_prompt_path'] 
 
     def get_context(self, row: dict, text_cols: list):
         text = ''
@@ -30,9 +38,10 @@ class Tagger:
         ptr, depth = self.taxonomy.get('root'), 0
         while ptr:
             labels = [x for x in ptr.get('labels')]
-            print(labels)
-            exit(1)
-
+            if len(labels) == 1 and ptr.get('task') == 'Classification':
+                res[f'L{depth}'] = labels[0]
+            else:
+                
 
     def __call__(self, df: pd.DataFrame, text_cols: list, image_col: str = None):
         if image_col is None:

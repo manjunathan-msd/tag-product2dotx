@@ -330,6 +330,8 @@ class FillAttributes:
     def __call__(self, df: pd.DataFrame, prompt_path: str = 'prompts/fill_attributes.txt', note: str = None):
         # Get all the valid cols, valid cols are levels
         valid_cols = [re.search(r'\bL\d+\b', x).group() for x in df.columns if re.search(r'\bL\d+\b', x)]
+        if 'A' not in list(df.columns):
+            df['A'] = np.nan
         # Create the prompt path
         if note:
             prompt_path = 'prompts/fill_attributes_dynamic.txt'
@@ -437,6 +439,8 @@ class FillValues:
         # Get all the valid cols, valid cols are levels and 'A' which stand for attribute
         valid_cols = [re.search(r'\bL\d+\b', x).group() for x in df.columns if re.search(r'\bL\d+\b', x)]
         valid_cols.append('A')
+        if 'V' not in list(df.columns):
+            df['V'] = np.nan
         # Crate the prompt path
         if note:
             prompt_path = 'prompts/fill_values_dynamic.txt'

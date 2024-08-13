@@ -118,4 +118,4 @@ configs.yaml
 Miniconda3-latest-Linux-x86_64.sh
 
 # Unnecessary folders
-hf_models
+pretrained_models
