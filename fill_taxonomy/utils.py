@@ -5,7 +5,6 @@ from concurrent.futures import ThreadPoolExecutor
 import re
 import numpy as np
 import pandas as pd
-from sklearn.metrics.pairwise import cosine_similarity
 from tqdm import tqdm
 from models.chatgpt import MetaChatGPT
 
@@ -28,6 +27,27 @@ class FillMetadata:
                 'Ranges': 'prompts/ranges.txt', 
                 'Units': 'prompts/units.txt'
             }
+    
+    @staticmethod
+    def get(breadcrumb: str, values: str, metdata_name: str):
+        # Path of metdata
+        metadata = {
+            'Classification / Extraction': 'prompts/classification_or_extraction.txt', 
+            'Single Value / Multi Value': 'prompts/single_value_or_multi_value.txt', 
+            'Input Priority': 'prompts/input_priority.txt',
+            'Data Type': 'prompts/data_type.txt', 
+            'Ranges': 'prompts/ranges.txt', 
+            'Units': 'prompts/units.txt'
+        }
+        # Client
+        client = MetaChatGPT(model_name='gpt-4o-mini', data_type='text', prompt_path=metadata[metdata_name])
+        # Inference
+        payload = {
+            'attribute': breadcrumb,
+            'values': values
+        }
+        response = client(**payload)
+        return response
 
     # Function to get metadata using LLM
     def inference(self, *args):
@@ -60,7 +80,7 @@ class FillMetadata:
         # Assign all metadata column by NaN values
         for col in self.metadata:
             if col not in list(df.columns):
-                self.df[col] = np.nan
+                df[col] = np.nan
         # Get valid cols and create breadcrumb
         valid_cols = [re.search(r'\bL\d+\b', x).group() for x in df.columns if re.search(r'\bL\d+\b', x)]
         valid_cols.append('A')
@@ -99,8 +119,48 @@ class FindSynonyms:
             'Breadcrumb': taxonomy + ' > ' + attribute,
             'V': value,
             'Synonyms': response 
-        }   
+        }
     
+    # Get the metadata for a single sample
+    @staticmethod
+    def get(breadcrumb: str, value: str, note: str):
+        if note:
+            prompt_path = 'prompts/synonyms_dynamic_policy_2.txt'
+        else:
+            prompt_path = 'prompts/synonyms_policy_2.txt'
+        client = MetaChatGPT(model_name='gpt-4o-mini', data_type='text', prompt_path=prompt_path)
+        taxonomy , attribute = ' > '.join(breadcrumb.split(' > ')[:-1]), breadcrumb.split(' > ')[-1]
+        if note:
+            payload = {
+                'taxonomy': taxonomy,
+                'attribute': attribute,
+                'value': value,
+                'note': note
+            }
+        else:
+            payload = {
+                'taxonomy': taxonomy,
+                'attribute': attribute,
+                'value': value
+            }
+        synonyms = client(**payload)
+        if synonyms.startswith('result') or synonyms.startswith('Result'):
+            synonyms.replace('result', '')
+            synonyms = synonyms.replace("```", '')
+            synonyms = synonyms.strip()
+        results = []
+        for syn_pair in synonyms.split('\n'):
+            idx = syn_pair.find(':')
+            word = syn_pair[:idx]
+            syns = syn_pair[idx+1:].strip()
+            results.append(
+                {
+                    'Breadcrumb': breadcrumb,
+                    'V': word,
+                    'Synonyms': syns
+                }
+            )
+        
     # Recall based policy: Policy 1
     def policy_1(self, df: pd.DataFrame, note: str = None):
         levels = [re.search(r'\bL\d+\b', x).group() for x in df.columns if re.search(r'\bL\d+\b', x)]
@@ -400,3 +460,4 @@ class FillValues:
         else:
             df.drop(columns='hierarchy', inplace=True)
         return df
+    
