@@ -6,7 +6,7 @@ from taxonomy_builder.utils import TaxonomyTree
 # # Read data
 url = 'dumps/ELECTRONICS MASTER TAXONOMY - DEV - Taxonomy class.csv'
 df = pd.read_csv(url)
-df = df.head(5)
+df = df.head(30)
 print(df)
 
 # Declare object

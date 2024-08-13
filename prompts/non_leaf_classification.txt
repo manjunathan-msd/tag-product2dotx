@@ -1,0 +1,10 @@
+Details of a product is given as input:
+Input:
+```
+{context}
+```
+
+Take your time and think step by step to classify the product among one of the following categories. Categories are defined as follows:
+{labels}
+
+Return only the catgory of the product. Don't return additional text. Maintain the format strictly.

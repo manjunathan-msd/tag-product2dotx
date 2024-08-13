@@ -18,11 +18,13 @@ class TaxonomyNode:
             self.metadata[x] = None
     
     def get(self, x: str):
-        if x == 'name':
+        if x == 'root':
+            return self.root
+        elif x == 'name':
             return self.name
         elif x == 'children':
             return self.children
-        elif x == 'lables':
+        elif x == 'labels':
             return self.labels
         elif x == 'node_type':    
             return self.node_type
@@ -43,17 +45,17 @@ class TaxonomyNode:
     
     def __str__(self):
         children_name = [children.get('name') for children in self.children]
-        res = f"Name: {self.name}\nChildren: {children_name}\nNode Type: {self.node_type}\nSynonyms: {self.synonyms}\n"
+        res = f"Name: {self.name}\nChildren: {children_name}\nLabel: {self.labels}\nNode Type: {self.node_type}\nSynonyms: {self.synonyms}\n"
         for x, y in self.metadata.items():
             res += f"{x}: {y}\n"
         return res
     
     def __repr__(self):
         children_name = [children.get('name') for children in self.children]
-        res = f"Name: {self.name}\nChildren: {children_name}\nNode Type: {self.node_type}\nSynonyms: {self.synonyms}\n"
+        res = f"Name: {self.name}\nChildren: {children_name}\nLabel: {self.labels}\nNode Type: {self.node_type}\nSynonyms: {self.synonyms}\n"
         for x, y in self.metadata.items():
             res += f"{x}: {y}\n"
-        return res  
+        return res
 
                    
 class TaxonomyTree:
@@ -95,6 +97,7 @@ class TaxonomyTree:
                     )
                     for x, y in zip(meta_columns, leaf_values[1:]):
                         newnode.add(x, y)
+                    newnode.add('labels', labels)
                     if syn_df:
                         for x in labels:
                             syns = syn_df[(syn_df['Breadcrumb']==ptr.get('name')) & (syn_df['A']==x)]['Synonyms'].to_list()
