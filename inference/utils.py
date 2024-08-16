@@ -5,7 +5,7 @@ import pandas as pd
 from tqdm import tqdm
 from taxonomy_builder.utils import TaxonomyTree
 from utils.string import *
-from models.phi3 import *
+from models import *
 
 
 '''
@@ -15,16 +15,16 @@ class Tagger:
     def __init__(self, taxonomy: TaxonomyTree, **configs):
         self.taxonomy = taxonomy
         # Load model
-        if configs['model']['name'] == 'phi3':                  # Modification  using getattr
-            if len(configs['model']['parameters']):
-                self.model = Phi3(**configs['model']['parameters'])
+        model_name = configs['model']['name']
+        if configs['model']['parameters']:
+            parameters = configs['model']['parameters']
+        if model_name in globals():
+            if len(parameters) == 0:
+                self.model = globals()[model_name]
             else:
-                self.model = Phi3()
-        elif configs['model']['name'] == 'phi3-vision':
-            if len(configs['model']['parameters']):
-                self.model = Phi3Vision(**configs['model']['parameters'])
-            else:
-                self.model = Phi3Vision()
+                self.model = globals()[model_name](**parameters)
+        else:
+            raise ValueError("Invalid LLM name!")
         self.mode = configs['inference']['level']
         # Read prompts
         self.prompts = {}
@@ -34,6 +34,19 @@ class Tagger:
             self.prompts['non_leaf_prompt'] = fp.read()
         with open(configs['prompts']['note']) as fp:
             self.prompts['note'] = fp.read()
+        self.model_taxonomy = None
+    
+    def set(self, x, val):
+        if x == 'model_taxonomy':
+            self.model_taxonomy = val
+        else:
+            raise ValueError("Invalid attribute to set!")
+    
+    def remove(self, x):
+        if x == 'model_taxonomy':
+            self.model_taxonomy = None
+        else:
+            raise ValueError("Invalid attribute to remove!")
 
     def get_context(self, row: dict, text_cols: list):
         text = ''
@@ -104,16 +117,55 @@ class Tagger:
                         resp, input_tokens, output_tokens, latency = self.model(prompt=prompt, image_url=image_url)
                         resp = postprocessing_llm_response(resp)
                         resp = text_to_dict(resp)
-                        res[f'L{depth}'] = {
-                            'Label': resp,
-                            'Input Tokens': input_tokens,
-                            'Output Tokens': output_tokens,
-                            'Latency': latency
-                        }
+                        temp = {}
+                        for x, y in resp.items():
+                            temp[x] = {
+                                'Label': y,
+                                'Input Tokens': input_tokens // len(resp),
+                                'Output Tokens': output_tokens // len(resp),
+                                'Latency': latency / len(resp)
+                            }
+                        res[f'L{depth}'] = temp
+                        ptr = None
+                    elif self.model == 'presets':
+                        temp = {}
+                        for attr in ptr.get('children'):
+                            name = attr.get('name')
+                            attribute = attr.get('name').split(' > ')[-1].strip()
+                            labels = attr.get('labels')
+                            taxonomy = json.dumps(attr.get('metadata'), indent=2)
+                            prompt = self.prompts['leaf_prompt'].format(taxonomy=taxonomy, context=context, note=self.prompts['note'], labels=labels, attribute=attribute)
+                            if name in self.model_taxonomy:
+                                if self.model_taxonomy[name] != 'LLM':
+                                    temp_model = globals()[self.model_taxonomy[name]]
+                                    resp, input_tokens, output_tokens, latency = temp_model(prompt=prompt, image_url=image_url)
+                                    del temp_model
+                                else:
+                                    resp, input_tokens, output_tokens, latency = self.model(prompt=prompt, image_url=image_url)
+                            else:
+                                print("Attribute isn't mentioned in taxonomy. Using default model!")
+                                resp, input_tokens, output_tokens, latency = self.model(prompt=prompt, image_url=image_url)
+                            if attr.get('Classification / Extraction') == 'Classification':
+                                label = get_most_similar(labels, resp)
+                            else:
+                                label = resp
+                            temp[attr.get('name').split(' > ')[-1]] = {
+                                'Label': label,
+                                'Input Tokens': input_tokens,
+                                'Output Tokens': output_tokens,
+                                'Latency': latency
+                            }
+                        res[f'L{depth}'] = temp
                         ptr = None
         return res          
 
-    def __call__(self, df: pd.DataFrame, text_cols: list, image_col: str = None, note: str = None):
+    def __call__(self, df: pd.DataFrame, text_cols: list, image_col: str = None, note: str = None, 
+                 model_taxonomy: dict =  None):
+        if self.mode is 'presets':
+            if model_taxonomy is None:
+                raise AttributeError("Model Taxonomy is needed for 'presets' mode!")
+            else:
+                self.set('model_taxonomy', model_taxonomy)
         if image_col is None:
             df['image_path'] = np.nan
             image_col = 'image_path'
@@ -125,7 +177,7 @@ class Tagger:
             image_url = self.get_image(row, image_col)
             context = self.get_context(row, text_cols)
             try:
-                tags = self.tag(context, image_url)
+                tags = self.tag(context, image_url, model_taxonomy)
                 tags = json.dumps(tags, indent=4)
                 row['results'] = tags
                 res.append(row)
@@ -134,4 +186,6 @@ class Tagger:
         res = pd.DataFrame(res)
         if res[image_col].isnull().sum() == res.shape[0]:
             res.drop(columns=image_col, inplace=True)
+        if self.mode == 'presets':
+            self.remove('model_taxonomy')
         return res
