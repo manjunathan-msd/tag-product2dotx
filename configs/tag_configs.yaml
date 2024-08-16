@@ -1,11 +1,11 @@
 model:
   name: phi3
   parameters:
-    max_new_tokens: 512
+    max_new_tokens: 128
 prompts:
   non_leaf_prompt_path: prompts/non_leaf_classification.txt
-  leaf_prompt_path: prompts/leaf_classification.txt
+  leaf_prompt_path: prompts/leaf_classification_category.txt
   note: prompts/note.txt
 inference:
-  level: attribute    # level can be attribute or category
+  level: category    # level can be attribute or category
   

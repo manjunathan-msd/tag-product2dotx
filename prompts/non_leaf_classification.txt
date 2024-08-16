@@ -9,3 +9,4 @@ Take your time and think step by step to classify the product among one of the f
 
 If the product can't be classified in any of the following categories then retun 'Not specified'.
 Return only the catgory of the product. Don't return additional text. Maintain the format strictly.
+Keep in mind that don't retun any explanation. Return only the result.

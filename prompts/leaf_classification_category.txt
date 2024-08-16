@@ -1,0 +1,29 @@
+Details of a product and its taxonomy are given as input. Your task is depending on the inputs classify the product in relevant category / categories:
+Input:
+```
+Taxonomy:
+{taxonomy}
+
+Context:
+{context}
+```
+Note:
+{note}
+
+Take your time and think step by step to classify / extract attributes of the product. Attributes and it's values are given as follows:
+{labels}
+
+Keep in mind that if it's a classification task then result must be one of the mentioned labels. For classification task if any of the given labels isn't relevant then return 'Not specified'. For extraction task any relevant answer from the context can be returned but if any relevant answer can't be found then return 'Not specified'.
+Either perform classification or extraction, depending on the task mentioned in the taxonomy. 
+For classification task if 'Single Value' is mentioned then return only one value. If 'Multi Value' is mentioned then multiple values can be returned.
+Return only the result. If there are multiple labels in the results then return it seperated by comma.
+The output should be returned in the folllowing format:
+```
+<attr1>: <val11>, <val12>, .... <val1n>
+<attr2>: <val21>, <val22>, .... <val2n>
+.
+.
+.
+<attrm>: <valm1>, <valm2>, .... <valmn>
+```
+Don't return any explanation or any additional text. First letter of each word should be in capital letter. Maintain the format strictly.
