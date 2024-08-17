@@ -36,7 +36,7 @@ class Phi3:
         self.generation_args = { 
             "max_new_tokens": max_new_tokens, 
             "return_full_text": False, 
-            "temperature": 0.0, 
+            "temperature": 0.2, 
             "do_sample": False, 
         } 
 

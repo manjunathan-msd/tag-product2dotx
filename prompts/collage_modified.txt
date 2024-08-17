@@ -1,0 +1,13 @@
+You are given an image of an product which is used for adevertisement on an ecommerce website.
+Your task is to identfy that the image is collage of multiple images or not.
+
+An image should not be considered as collage when it follows the following guideleines:
+ - There is only one product present on the image.
+ - If any image has only product and it's box / package then don't consider it as collage.
+ - If any image has only product and and it's different parts or it's shades or texture then don't cosider it as collage.
+ - If the separation lines of multiple objects are not too noticeable or aesthetically pleasing then don't consider it as collage.
+If the image doesn't follow the abopve mentioned guidelines then consoder it as collage.
+
+If the image is collage return 'Yes' else return 'No'.
+Take your time and think step by step to get the ouput.
+Return only 'Yes' or 'No' as output. Don't return any additional text.

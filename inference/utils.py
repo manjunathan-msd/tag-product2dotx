@@ -64,8 +64,9 @@ class Tagger:
         ptr, depth = self.taxonomy.get('root'), 0
         while ptr:
             labels = [x for x in ptr.get('labels')]
-            if len(labels) == 1 and ptr.get('task') == 'Classification':
+            if len(labels) == 1 and ptr.get('Classification / Extraction') == 'Classification':
                 res[f'L{depth}'] = labels[0]
+                ptr = ptr.get('children')[0]
             else:
                 if ptr.get('Classification / Extraction') == 'Classification' and ptr.get('node_type') == 'category':
                     prompt = self.prompts['non_leaf_prompt'].format(context=context, labels=labels)
@@ -157,11 +158,13 @@ class Tagger:
                             }
                         res[f'L{depth}'] = temp
                         ptr = None
+                    else:
+                        raise ValueError("Wrong value of ")
         return res          
 
     def __call__(self, df: pd.DataFrame, text_cols: list, image_col: str = None, note: str = None, 
                  model_taxonomy: dict =  None):
-        if self.mode is 'presets':
+        if self.mode == 'presets':
             if model_taxonomy is None:
                 raise AttributeError("Model Taxonomy is needed for 'presets' mode!")
             else:
@@ -177,7 +180,7 @@ class Tagger:
             image_url = self.get_image(row, image_col)
             context = self.get_context(row, text_cols)
             try:
-                tags = self.tag(context, image_url, model_taxonomy)
+                tags = self.tag(context, image_url)
                 tags = json.dumps(tags, indent=4)
                 row['results'] = tags
                 res.append(row)

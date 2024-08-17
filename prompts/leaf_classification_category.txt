@@ -26,4 +26,5 @@ The output should be returned in the folllowing format:
 .
 <attrm>: <valm1>, <valm2>, .... <valmn>
 ```
+The attribute-value pairs must be placed on a newline. DOn't place more than one attribute-value pair on a single line. Maintain it strictly.
 Don't return any explanation or any additional text. First letter of each word should be in capital letter. Maintain the format strictly.

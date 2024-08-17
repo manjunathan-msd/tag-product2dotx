@@ -7,22 +7,18 @@ from taxonomy_builder.utils import TaxonomyTree
 from inference.utils import Tagger
 
 # Read taxonomy, data and configs
-tax_df = pd.read_csv('https://docs.google.com/spreadsheets/d/1z2wvzHUavp76-IXXPBeVJpkU7irMAzsuru8vSzhyxtk/export?format=csv&gid=1501522586')
-tax_df.set_index('L2', inplace=True)
-tax_df = tax_df['L3']
-print(tax_df.to_dict())
-exit(1)
+tax_df = pd.read_csv('https://docs.google.com/spreadsheets/d/1z2wvzHUavp76-IXXPBeVJpkU7irMAzsuru8vSzhyxtk/export?format=csv&gid=902518976')
 with open('configs/tag_configs.yaml') as fp:
     configs = yaml.safe_load(fp)
-df = pd.read_csv('dumps/data.csv')
-
+df = pd.read_csv('/home/ubuntu/efs/users/gk/miravia/training_data/collage/sample_set_to_test_llm.csv')
+df = df.head(500)
 
 # Create Taxonomy Tree
 tree = TaxonomyTree()
-tree(tax_df)
+tree(tax_df, meta_columns=['Classification / Extraction', 'Single Value / Multi Value', 'Definition'])
 
 # Do Tagging
 tagger = Tagger(tree, **configs)
-res = tagger(df, text_cols=['title', 'dimension', 'materials_and_finish', 'color', 'sale_price'], image_col='image_url')
-res.to_csv('dumps/phi3_category_text.csv', index=False)
+res = tagger(df, text_cols=[], image_col='Image_URL')
+res.to_csv('dumps/miravia_collage_v1.csv', index=False)
 

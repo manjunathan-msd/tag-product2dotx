@@ -1,11 +1,10 @@
 model:
-  name: phi3
+  name: Phi3Vision
   parameters:
     max_new_tokens: 128
 prompts:
-  non_leaf_prompt_path: prompts/non_leaf_classification.txt
-  leaf_prompt_path: prompts/leaf_classification_category.txt
+  non_leaf_prompt_path: prompts/non_leaf_classification_attribute_image_only.txt
+  leaf_prompt_path: prompts/collage_modified.txt
   note: prompts/note.txt
 inference:
-  level: category    # level can be 'attribute', 'category' and 'presets'
-  
+  level: attribute    # level can be 'attribute', 'category' and 'presets'

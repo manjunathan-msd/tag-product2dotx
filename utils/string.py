@@ -19,6 +19,9 @@ def postprocessing_llm_response(text: str):
             text = text.replace(word, '')
     # Remove extra spaces
     text = re.sub(r'[ \t]+', ' ', text).strip()
+    # Revomre trailing comma
+    if text[-1] == ',':
+        text = text[:-1]
     return text
     
 # Create text to dict

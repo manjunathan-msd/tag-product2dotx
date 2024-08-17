@@ -65,7 +65,7 @@ class TaxonomyNode:
 class TaxonomyTree:
     def __init__(self):
         self.n_levels = None
-        self.root = TaxonomyNode(name='root')
+        self.root = None
         self.res = ''
         
     def get(self, x):
@@ -89,7 +89,7 @@ class TaxonomyTree:
 
     def add(self, row: list, meta_columns: list, syn_df: pd.DataFrame = None):
         ptr = self.root
-        levels, leaf_values = list(row.values())[:self.n_levels], list(row.values())[self.n_levels:-1]
+        levels, leaf_values = list(row.values())[:self.n_levels], list(row.values())[self.n_levels:]
         levels = [x.strip() for x in levels if not pd.isna(x)]
         for node in levels:
             flag = True
@@ -122,6 +122,7 @@ class TaxonomyTree:
                 else:
                     newnode = TaxonomyNode(
                         name=ptr.get('name') + ' > ' + node if ptr.get('name') != 'root' else node,
+                        metadata_names=meta_columns
                     )
                 ptr.add('children', newnode)
                 ptr = newnode
@@ -131,12 +132,6 @@ class TaxonomyTree:
         if len(root.get('children')) == 0:
             root.add('node_type', 'attribute')
             return
-        # elif root.get('name') == 'root':
-        #     root.add('labels', [children.get('name').split(' > ')[-1] for children in root.get('children')])
-        #     root.add('Classificatio')
-        #     root.add('node_type', 'category')
-        #     for x in metadata_names:
-        #         root.add(x, 'NA')
         elif root.get('Classification / Extraction') == 'NA':
             pass
         else:
@@ -157,6 +152,7 @@ class TaxonomyTree:
                                                                                           'Single Value / Multi Value', 
                                                                                           'Data Type', 'Ranges', 'Units', 
                                                                                           'Input Priority']):
+        self.root = TaxonomyNode(name='root', metadata_names=meta_columns)
         levels = [re.search(r'\bL\d+\b', x).group() for x in df.columns if re.search(r'\bL\d+\b', x)]
         levels.extend(['A', 'V'])
         self.n_levels = len(levels) - 1
