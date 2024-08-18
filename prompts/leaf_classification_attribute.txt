@@ -1,4 +1,4 @@
-Details of a product and its taxonomy are given as input. Details of a product is given as input. Your task is depending on the inputs classify the product in relevant category / categories:
+Details of a product and its taxonomy are given as input. Your task is depending on the inputs classify the product in relevant category / categories:
 Input:
 ```
 Taxonomy:

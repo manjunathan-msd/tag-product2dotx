@@ -34,17 +34,22 @@ class Tagger:
             self.prompts['non_leaf_prompt'] = fp.read()
         with open(configs['prompts']['note']) as fp:
             self.prompts['note'] = fp.read()
-        self.model_taxonomy = None
+        self.model_taxonomy = {}
+        self.additional_prompts = {}
     
     def set(self, x, val):
         if x == 'model_taxonomy':
             self.model_taxonomy = val
+        elif x == 'additional_prompts':
+            self.additional_prompts = val
         else:
             raise ValueError("Invalid attribute to set!")
     
     def remove(self, x):
         if x == 'model_taxonomy':
             self.model_taxonomy = None
+        elif x == 'additional_prompts':
+            self.additional_prompts = None
         else:
             raise ValueError("Invalid attribute to remove!")
 
@@ -128,19 +133,22 @@ class Tagger:
                             }
                         res[f'L{depth}'] = temp
                         ptr = None
-                    elif self.model == 'presets':
+                    elif self.mode == 'presets':
                         temp = {}
                         for attr in ptr.get('children'):
                             name = attr.get('name')
                             attribute = attr.get('name').split(' > ')[-1].strip()
                             labels = attr.get('labels')
                             taxonomy = json.dumps(attr.get('metadata'), indent=2)
-                            prompt = self.prompts['leaf_prompt'].format(taxonomy=taxonomy, context=context, note=self.prompts['note'], labels=labels, attribute=attribute)
+                            if name in self.additional_prompts:
+                                prompt = self.additional_prompts[name].format(taxonomy=taxonomy, context=context, note=self.prompts['note'], labels=labels, attribute=attribute)
+                            else:
+                                prompt = self.prompts['leaf_prompt'].format(taxonomy=taxonomy, context=context, note=self.prompts['note'], labels=labels, attribute=attribute)
                             if name in self.model_taxonomy:
                                 if self.model_taxonomy[name] != 'LLM':
-                                    temp_model = globals()[self.model_taxonomy[name]]
+                                    temp_model = globals()[self.model_taxonomy[name]]()
                                     resp, input_tokens, output_tokens, latency = temp_model(prompt=prompt, image_url=image_url)
-                                    del temp_model
+
                                 else:
                                     resp, input_tokens, output_tokens, latency = self.model(prompt=prompt, image_url=image_url)
                             else:
@@ -159,16 +167,20 @@ class Tagger:
                         res[f'L{depth}'] = temp
                         ptr = None
                     else:
-                        raise ValueError("Wrong value of ")
+                        raise ValueError("Wrong value of inference mode!")
         return res          
 
     def __call__(self, df: pd.DataFrame, text_cols: list, image_col: str = None, note: str = None, 
-                 model_taxonomy: dict =  None):
+                 model_taxonomy: dict =  None, additional_prompts: dict = None):
         if self.mode == 'presets':
             if model_taxonomy is None:
                 raise AttributeError("Model Taxonomy is needed for 'presets' mode!")
             else:
                 self.set('model_taxonomy', model_taxonomy)
+            if additional_prompts is None:
+                raise AttributeError("Additional prompts are needed for 'presets' mode!")
+            else:
+                self.set('additional_prompts', additional_prompts)
         if image_col is None:
             df['image_path'] = np.nan
             image_col = 'image_path'
@@ -191,4 +203,5 @@ class Tagger:
             res.drop(columns=image_col, inplace=True)
         if self.mode == 'presets':
             self.remove('model_taxonomy')
+            self.remove('additional_prompts')
         return res

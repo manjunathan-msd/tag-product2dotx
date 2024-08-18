@@ -1,5 +1,5 @@
 Classification / Extraction:
-    - Classification: Output should be predicted from the given labels. If not match is found from the given labels then 'Not specified' should bre returned.
+    - Classification: Output should be predicted from the given labels. If no match is found from the given labels then 'Not specified' should bre returned.
     - Extraction: Any relevant answer to the question can be returned.
 
 Single Value / Multi Value:

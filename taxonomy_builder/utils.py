@@ -108,14 +108,16 @@ class TaxonomyTree:
                     for x, y in zip(meta_columns, leaf_values[1:]):
                         newnode.add(x, y)
                     newnode.add('labels', labels)
-                    if syn_df:
+                    if isinstance(syn_df, pd.DataFrame):
+                        syn_dict = {}
                         for x in labels:
-                            syns = syn_df[(syn_df['Breadcrumb']==ptr.get('name')) & (syn_df['A']==x)]['Synonyms'].to_list()
+                            syns = syn_df[(syn_df['Breadcrumb']==newnode.get('name')) & (syn_df['V']==x)]['Synonyms'].to_list()
                             if len(syns) > 0:
                                 syns = syns[0]
                             else:
                                 continue
-                            newnode.add('synonyms')(x, syns)
+                            syn_dict[x] = syns
+                        newnode.add('synonyms', syn_dict)
                     ptr.add('node_type', 'NA')
                     for x in meta_columns:
                         ptr.add(x, 'NA')
