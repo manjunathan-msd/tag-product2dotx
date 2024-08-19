@@ -74,8 +74,23 @@ class Tagger:
                 ptr = ptr.get('children')[0]
             else:
                 if ptr.get('Classification / Extraction') == 'Classification' and ptr.get('node_type') == 'category':
-                    prompt = self.prompts['non_leaf_prompt'].format(context=context, labels=labels)
-                    resp, input_tokens, output_tokens, latency = self.model(prompt=prompt, image_url=image_url)
+                    if self.mode == 'presets':
+                        name = ptr.get('name')
+                        if name in self.additional_prompts:
+                            prompt = self.additional_prompts[name].format(context=context, labels=labels)
+                        else:
+                            prompt = self.prompts['non_leaf_prompt'].format(context=context, labels=labels)
+                        if name in self.model_taxonomy:
+                            if self.model_taxonomy[name] != 'LLM':
+                                temp_model = globals()[self.model_taxonomy[name]]()
+                                resp, input_tokens, output_tokens, latency = temp_model(prompt=prompt, image_url=image_url)
+                            else:
+                                resp, input_tokens, output_tokens, latency = self.model(prompt=prompt, image_url=image_url)
+                        else:
+                            resp, input_tokens, output_tokens, latency = self.model(prompt=prompt, image_url=image_url)   
+                    else:
+                        prompt = self.prompts['non_leaf_prompt'].format(context=context, labels=labels)
+                        resp, input_tokens, output_tokens, latency = self.model(prompt=prompt, image_url=image_url)
                     if resp == 'Not specified':
                         return res
                     label = get_most_similar(labels, resp)
@@ -148,11 +163,10 @@ class Tagger:
                                 if self.model_taxonomy[name] != 'LLM':
                                     temp_model = globals()[self.model_taxonomy[name]]()
                                     resp, input_tokens, output_tokens, latency = temp_model(prompt=prompt, image_url=image_url)
-
                                 else:
                                     resp, input_tokens, output_tokens, latency = self.model(prompt=prompt, image_url=image_url)
                             else:
-                                print("Attribute isn't mentioned in taxonomy. Using default model!")
+                                # print("Attribute isn't mentioned in taxonomy. Using default model!")
                                 resp, input_tokens, output_tokens, latency = self.model(prompt=prompt, image_url=image_url)
                             if attr.get('Classification / Extraction') == 'Classification':
                                 label = get_most_similar(labels, resp)

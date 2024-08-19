@@ -1,6 +1,12 @@
 # Import librraies
+from typing import Union, List
 import re
 from fuzzywuzzy import process
+import nltk
+# nltk.download('punkt')
+from nltk.tokenize import word_tokenize
+from nltk.stem import PorterStemmer
+
 
 
 # Get most similar string
@@ -33,3 +39,30 @@ def text_to_dict(text: str):
         val = line[idx+1:].strip() if idx!=-1 else ''
         res[key] = val
     return res
+
+# Tokenize words
+def tokenize(text: str, level: str = 'word'):
+    if level == 'word':
+        # Lowercase the text
+        text = text.lower()
+        # Remove punctuations by space
+        text = re.sub(r'[^\w\s-]', '', text)
+        # Remove extra spaces
+        text = re.sub(r'[ \t]+', ' ', text).strip()
+        # Tokenize text
+        tokenized_words = word_tokenize(text)
+        return tokenized_words
+    else:
+        raise ValueError("Invalid parameter of level for tokenization!")
+    
+    
+# Stemming of words
+def stem_words(words: Union[str, List[str]]):
+    stemmer = PorterStemmer()
+    if isinstance(words, str):
+        return stemmer.stem(words.lower())
+    else:
+        return [stemmer.stem(x.lower()) for x in words]
+        
+
+    
