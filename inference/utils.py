@@ -13,8 +13,9 @@ The class can tag data when a TaxonomyTree and data is given
 '''
 class Tagger:
     def __init__(self, taxonomy: TaxonomyTree, **configs):
+        # Get the taxonomy
         self.taxonomy = taxonomy
-        # Load model
+        # Load deafult models and it's configs
         model_name = configs['model']['name']
         if configs['model']['parameters']:
             parameters = configs['model']['parameters']
@@ -25,8 +26,11 @@ class Tagger:
                 self.model = globals()[model_name](**parameters)
         else:
             raise ValueError("Invalid LLM name!")
+        # Load inference configs
         self.mode = configs['inference']['level']
-        # Read prompts
+        self.text_cols = configs['inference']['text_cols']
+        self.image_cols = configs['inference']['image_cols']
+        # Read default prompts
         self.prompts = {}
         with open(configs['prompts']['leaf_prompt_path']) as fp:
             self.prompts['leaf_prompt'] = fp.read()
@@ -34,9 +38,11 @@ class Tagger:
             self.prompts['non_leaf_prompt'] = fp.read()
         with open(configs['prompts']['note']) as fp:
             self.prompts['note'] = fp.read()
+        # Dictionary to store preset models and taxonomy
         self.model_taxonomy = {}
         self.additional_prompts = {}
     
+    # Function to set parameter of the object
     def set(self, x, val):
         if x == 'model_taxonomy':
             self.model_taxonomy = val
@@ -45,6 +51,7 @@ class Tagger:
         else:
             raise ValueError("Invalid attribute to set!")
     
+    # Function to remove paramter of the object
     def remove(self, x):
         if x == 'model_taxonomy':
             self.model_taxonomy = None
@@ -53,169 +60,222 @@ class Tagger:
         else:
             raise ValueError("Invalid attribute to remove!")
 
-    def get_context(self, row: dict, text_cols: list):
-        text = ''
-        for col in text_cols:
-            if not pd.isna(row[col]):         
-                text += col + ': ' + row[col] + '\n'
-        return text
+    # def get_context(self, row: dict, text_cols: list):
+    #     text = ''
+    #     for col in text_cols:
+    #         if not pd.isna(row[col]):         
+    #             text += col + ': ' + row[col] + '\n'
+    #     return text
     
-    def get_image(self, row: dict, image_col: str):
-        image_url = row[image_col]
-        return image_url 
+    # def get_image(self, row: dict, image_col: str):
+    #     image_url = row[image_col]
+    #     return image_url 
 
-    def tag(self, context: str, image_url: str = None):
+    # Tag data
+    def tag(self, data_dict: dict):
+        # Store the tags
         res = {}
+        # Initialize starting node and depth
         ptr, depth = self.taxonomy.get('root'), 0
         while ptr:
-            labels = [x for x in ptr.get('labels')]
+            # Get labels of current node
+            labels = ptr.get('labels')
+            # If number of labels is 1 and the task is a Classification task then store the label as the answer
             if len(labels) == 1 and ptr.get('Classification / Extraction') == 'Classification':
                 res[f'L{depth}'] = labels[0]
                 ptr = ptr.get('children')[0]
             else:
+                # If the current node is a non-leaf node
                 if ptr.get('Classification / Extraction') == 'Classification' and ptr.get('node_type') == 'category':
-                    if self.mode == 'presets':
-                        name = ptr.get('name')
-                        if name in self.additional_prompts:
-                            prompt = self.additional_prompts[name].format(context=context, labels=labels)
-                        else:
-                            prompt = self.prompts['non_leaf_prompt'].format(context=context, labels=labels)
-                        if name in self.model_taxonomy:
-                            if self.model_taxonomy[name] != 'LLM':
-                                temp_model = globals()[self.model_taxonomy[name]]()
-                                resp, input_tokens, output_tokens, latency = temp_model(prompt=prompt, image_url=image_url)
-                            else:
-                                resp, input_tokens, output_tokens, latency = self.model(prompt=prompt, image_url=image_url)
-                        else:
-                            resp, input_tokens, output_tokens, latency = self.model(prompt=prompt, image_url=image_url)   
+                    # Get the breadcrumb of the node
+                    name = ptr.get('name')
+                    # Get the prompt for the node
+                    if self.mode == 'presets' and name in self.additional_prompts:
+                        prompt = self.additional_prompts[name]
                     else:
-                        prompt = self.prompts['non_leaf_prompt'].format(context=context, labels=labels)
-                        resp, input_tokens, output_tokens, latency = self.model(prompt=prompt, image_url=image_url)
+                        prompt = self.prompts['non_leaf_prompt']
+                    # Prepare taxonomy_dict and metdata_dict
+                    taxonomy_dict = {
+                        'breadcrumb': name,
+                        'labels': labels,
+                        'prompt': prompt,
+                        'default_text_cols': self.text_cols,
+                        'deafault_image_cols': self.image_cols,
+                        'inference_mode': self.mode
+                    }
+                    metadata_dict = ptr.get('metadata')
+                    # Get the model for the node and use the model for inference
+                    if self.mode == 'presets' and name in self.model_taxonomy:
+                        # Get the preset model name and it's parameters
+                        additional_model_name = self.model_taxonomy['name']['model_name']
+                        additrional_model_parameters = self.model['name']['parameters']
+                        # Declare the model
+                        temp_model = globals()[additional_model_name](**additrional_model_parameters)
+                        # Inference the model
+                        resp, input_tokens, output_tokens, latency = temp_model(taxonomy_dict, data_dict, metadata_dict)
+                        # Delete the model
+                        del temp_model
+                    else:
+                        # Call the default model
+                        resp, input_tokens, output_tokens, latency = self.model(taxonomy_dict, data_dict, metadata_dict)   
+                    # If result is 'Not specified' then there is no point to traverse the tree
                     if resp == 'Not specified':
+                        res[f'L{depth}'] = 'Not specified'
                         return res
+                    # Get the most similar label of response using fuzzy-matching
                     label = get_most_similar(labels, resp)
+                    # Store the result of the depth
                     res[f'L{depth}'] = {
                         'Label': label,
                         'Input Tokens': input_tokens,
                         'Output Tokens': output_tokens,
                         'Latency': latency
                     }
+                    # Move to the next children
                     ptr = ptr.get('children')[labels.index(label)]
                     depth += 1
+                # If the current node is a leaf node
                 elif ptr.get('Classification / Extraction') == 'NA' and ptr.get('node_type') == 'NA':
+                    # If current mode is 'attribute'
                     if self.mode == 'attribute':
+                        # Store each attribute's result temporarily
                         temp = {}
+                        # Traverse all attributes
                         for attr in ptr.get('children'):
-                            attribute = attr.get('name').split(' > ')[-1].strip()
-                            labels = attr.get('labels')
-                            taxonomy = json.dumps(attr.get('metadata'), indent=2)
-                            prompt = self.prompts['leaf_prompt'].format(taxonomy=taxonomy, context=context, note=self.prompts['note'], labels=labels, attribute=attribute)
-                            resp, input_tokens, output_tokens, latency = self.model(prompt=prompt, image_url=image_url)
+                            # Prepare taxonomy_dict and metadata_dict
+                            taxonomy_dict = {
+                                'breadcrumb': attr,
+                                'labels': attr.get('labels'),
+                                'prompt': self.prompts['leaf_prompt'],
+                                'default_text_cols': self.text_cols,
+                                'deafault_image_cols': self.image_cols,
+                                'inference_mode': self.mode
+                            }
+                            metadata_dict = attr.get('metdata')
+                            # Use the model for inference
+                            resp, input_tokens, output_tokens, latency = self.model(taxonomy_dict, data_dict, metadata_dict)
+                            # For classification task, get the most similar label and for extraction task no postprocessing is needed
                             if attr.get('Classification / Extraction') == 'Classification':
                                 label = get_most_similar(labels, resp)
                             else:
                                 label = resp
+                            # Store the attribute's result
                             temp[attr.get('name').split(' > ')[-1]] = {
                                 'Label': label,
                                 'Input Tokens': input_tokens,
                                 'Output Tokens': output_tokens,
                                 'Latency': latency
                             }
+                        # Store all attributes result
                         res[f'L{depth}'] = temp
+                        # End of traversal
                         ptr = None
+                    # If current model is 'category'
                     elif self.mode == 'category':
-                        taxonomies = {}
-                        attribute_label_map = {}
+                        # Prepare taxonomy and metdata dict
+                        taxonomy_dict, metadata_dict = {}, {}
+                        # Traverse all the attributes and prepare it
                         for attr in ptr.get('children'):
                             attribute = attr.get('name').split(' > ')[-1].strip()
-                            labels = attr.get('labels')
-                            taxonomy = attr.get('metadata')
-                            taxonomies[attribute] = taxonomy
-                            attribute_label_map[attribute] = labels
-                        taxonomies = json.dumps(taxonomies, indent=4)
-                        attribute_label_map = json.dumps(attribute_label_map, indent=4)
-                        prompt = self.prompts['leaf_prompt'].format(taxonomy=taxonomies, context=context, note=self.prompts['note'], labels=attribute_label_map)
-                        resp, input_tokens, output_tokens, latency = self.model(prompt=prompt, image_url=image_url)
+                            taxonomy_dict[attribute] = {
+                                'breadcrumb': attr,
+                                'labels': attr.get('labels'),
+                                'prompt': self.prompts['leaf_prompt'],
+                                'default_text_cols': self.text_cols,
+                                'deafault_image_cols': self.image_cols,
+                                'inference_mode': self.mode
+                            } 
+                            metadata_dict[attribute] = attr.get('metadata')
+                        resp, input_tokens, output_tokens, latency = self.model(taxonomy_dict, data_dict, metadata_dict)
+                        # Postprocessing the response of LLM
                         resp = postprocessing_llm_response(resp)
                         resp = text_to_dict(resp)
+                        # Store the result
                         temp = {}
                         for x, y in resp.items():
                             temp[x] = {
-                                'Label': y,
+                                'Label': y,         # Check for classification can be added
                                 'Input Tokens': input_tokens // len(resp),
                                 'Output Tokens': output_tokens // len(resp),
                                 'Latency': latency / len(resp)
                             }
                         res[f'L{depth}'] = temp
+                        # End of the traversal
                         ptr = None
+                    # If current mode is presets
                     elif self.mode == 'presets':
+                        # Store each attribute's result temporarily
                         temp = {}
+                        # Traverse all the attributes
                         for attr in ptr.get('children'):
-                            name = attr.get('name')
-                            attribute = attr.get('name').split(' > ')[-1].strip()
-                            labels = attr.get('labels')
-                            taxonomy = json.dumps(attr.get('metadata'), indent=2)
+                            # Get the prompt
                             if name in self.additional_prompts:
-                                prompt = self.additional_prompts[name].format(taxonomy=taxonomy, context=context, note=self.prompts['note'], labels=labels, attribute=attribute)
+                                prompt = self.additional_prompts[name]
                             else:
-                                prompt = self.prompts['leaf_prompt'].format(taxonomy=taxonomy, context=context, note=self.prompts['note'], labels=labels, attribute=attribute)
+                                prompt = self.prompts['leaf_prompt']
+                            # Preapre taxonomy_dict and metadata_dict
+                            taxonomy_dict = {
+                                'breadcrumb': attr,
+                                'labels': attr.get('labels'),
+                                'prompt': prompt,
+                                'default_text_cols': self.text_cols,
+                                'deafault_image_cols': self.image_cols,
+                                'inference_mode': self.mode
+                            }
+                            metadata_dict = attr.get('metdata')
+                            # Get inference from the model
                             if name in self.model_taxonomy:
-                                if self.model_taxonomy[name] != 'LLM':
-                                    temp_model = globals()[self.model_taxonomy[name]]()
-                                    resp, input_tokens, output_tokens, latency = temp_model(prompt=prompt, image_url=image_url)
-                                else:
-                                    resp, input_tokens, output_tokens, latency = self.model(prompt=prompt, image_url=image_url)
+                                temp_model = globals()[self.model_taxonomy[name]]()
+                                resp, input_tokens, output_tokens, latency = temp_model(taxonomy_dict, data_dict, metadata_dict)
+                                del temp_model
                             else:
-                                # print("Attribute isn't mentioned in taxonomy. Using default model!")
-                                resp, input_tokens, output_tokens, latency = self.model(prompt=prompt, image_url=image_url)
+                                resp, input_tokens, output_tokens, latency = self.model(taxonomy_dict, data_dict, metadata_dict)
+                            # For classification task get most similar label, no postprocessing is needed for extraction
                             if attr.get('Classification / Extraction') == 'Classification':
                                 label = get_most_similar(labels, resp)
                             else:
                                 label = resp
+                            # Store the attribute's result
                             temp[attr.get('name').split(' > ')[-1]] = {
                                 'Label': label,
                                 'Input Tokens': input_tokens,
                                 'Output Tokens': output_tokens,
                                 'Latency': latency
                             }
+                        # Store all attribute's result
                         res[f'L{depth}'] = temp
+                        # End of traversal
                         ptr = None
+                    # Invalid inferencd mode
                     else:
                         raise ValueError("Wrong value of inference mode!")
+        # Return all tags for a record
         return res          
 
-    def __call__(self, df: pd.DataFrame, text_cols: list, image_col: str = None, note: str = None, 
-                 model_taxonomy: dict =  None, additional_prompts: dict = None):
+    def __call__(self, df: pd.DataFrame, note: str, model_taxonomy: dict =  None, additional_prompts: dict = None):
+        # For present model model_taxonomy is needed
         if self.mode == 'presets':
             if model_taxonomy is None:
                 raise AttributeError("Model Taxonomy is needed for 'presets' mode!")
             else:
                 self.set('model_taxonomy', model_taxonomy)
-            if additional_prompts is None:
-                raise AttributeError("Additional prompts are needed for 'presets' mode!")
-            else:
+            if additional_prompts is not None:
                 self.set('additional_prompts', additional_prompts)
-        if image_col is None:
-            df['image_path'] = np.nan
-            image_col = 'image_path'
-        if note is None:
-            with open('prompts/note.txt') as fp:
-                note = fp.read()
+        # List to store tags
         res = []
+        # Process all records
         for row in tqdm(df.to_dict(orient='records'), desc='Inferencing', total=df.shape[0]):
-            image_url = self.get_image(row, image_col)
-            context = self.get_context(row, text_cols)
             try:
-                tags = self.tag(context, image_url)
+                tags = self.tag(row)
                 tags = json.dumps(tags, indent=4)
                 row['results'] = tags
                 res.append(row)
             except Exception as err:
                 print(err)
         res = pd.DataFrame(res)
-        if res[image_col].isnull().sum() == res.shape[0]:
-            res.drop(columns=image_col, inplace=True)
+        # Delete the artifacts of the class
         if self.mode == 'presets':
             self.remove('model_taxonomy')
             self.remove('additional_prompts')
+        # Return tagged data
         return res
