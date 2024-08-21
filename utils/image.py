@@ -20,9 +20,8 @@ def encode_image(image_url: str):
     # Open the image with PIL
     image = Image.open(BytesIO(response.content))
     # Resize the image if any dimension is greater than 256
-    if image.size[0] > 256 or image.size[1] > 256:
-        image = image.resize((256, 256))
-    print(image.size)
+    if image.size[0] > 512 or image.size[1] > 512:
+        image = image.resize((512, 512))
     # Convert the image to base64 string
     buffered = BytesIO()
     image.save(buffered, format="PNG")

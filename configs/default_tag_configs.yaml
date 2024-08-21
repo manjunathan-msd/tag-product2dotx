@@ -1,0 +1,22 @@
+model:
+  name: FashionAPI
+  parameters:
+    url: https://use1.vue.ai/api/v1/inference?is_sync=true&is_skip_cache=true
+    headers:
+      x-api-key: 7432c4722bbc4947a0b2560ce5b48d65
+      Content-Type: application/json
+    catalog_id: 389a5cf510
+    graph_id: g-da333687-6519-4821-acd8-75818c2aadd1
+    feed_id: cyborg
+    # max_new_tokens: 64
+    # model_name: gpt-4o-mini
+    # word_dict:
+    #   red: red, reddish, redd
+    #   yellow: yellowish, yell, yellow
+    # return_type: single
+prompts:
+  non_leaf_prompt_path: prompts/non_leaf_classification.txt
+  leaf_prompt_path: prompts/leaf_classification_attribute.txt
+  note: prompts/note.txt
+inference:
+  level: attribute # level can be 'attribute', 'category' and 'presets'

@@ -57,7 +57,7 @@ class Tagger:
         text = ''
         for col in text_cols:
             if not pd.isna(row[col]):         
-                text += col + ': ' + row[col]
+                text += col + ': ' + row[col] + '\n'
         return text
     
     def get_image(self, row: dict, image_col: str):

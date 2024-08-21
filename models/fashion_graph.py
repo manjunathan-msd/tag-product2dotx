@@ -1,14 +1,13 @@
 # Import libraries
 import time
 import requests
-import json
 from models.chatgpt import ChatGPT
 
 
 '''
 The class can hit the current fashion models of MSD and get tags from that.
 '''
-class FashiopAPI:
+class FashionAPI:
     def __init__(self, url: str, headers: dict, catalog_id: str, graph_id: str, feed_id: str):
         self.url = url
         self.headers = headers
@@ -34,6 +33,9 @@ class FashiopAPI:
         for attr in response['data']['msd_tags'][0]['attributes']:
             res[attr['name']] = attr['results'][0]['value']
         end = time.time()
+        resp = ''
+        for x, y in res.items():
+            resp += f'{x}: {y}\n'
         return res, 'NA', 'NA', end - start
 
 
@@ -43,7 +45,7 @@ The class can hit the current fashion models of MSD and get tags. It also verify
 ''' 
 class GPTWithFashionAPIFeedback:
     def __init__(self, url: str, headers: dict, catalog_id: str, graph_id: str, feed_id: str):
-        self.fashion_model = FashiopAPI(url, headers, catalog_id, graph_id, feed_id)
+        self.fashion_model = FashionAPI(url, headers, catalog_id, graph_id, feed_id)
         self.gpt = ChatGPT()
         
     def __call__(self, prompt: str, image_url: str = None):
@@ -55,9 +57,9 @@ class GPTWithFashionAPIFeedback:
         Context:
         {prompt}
         Predictions:
-        f{json.dumps(resp, indent=4)}
+        f{resp}
         ```
-        If the predictions are correct then return the prediction as it is. If any of the predictions isn't correct then correct it and return all prediction in JSON format.
+        If the predictions are correct then return the prediction as it is. If any of the predictions isn't correct then correct it and return all predictions.
         Return the predictions in the same format as it's given as input. Don't retrun any additional text. Maintain the format strictly.
         '''
         resp, input_tokens, output_tokens, latency2 = self.gpt(prompt, image_url)

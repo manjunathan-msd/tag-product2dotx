@@ -58,7 +58,7 @@ class ChatGPT:
                 "text": prompt
             }
         ]
-        if image_url and self.model_name in ['gpt-4o-mini', 'gpt-4o']:
+        if image_url and self.model_name in ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']:
             try:
                 image_url = encode_image(image_url)
             except Exception as err:

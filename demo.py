@@ -8,7 +8,7 @@ from inference.utils import Tagger
 
 # Read taxonomy, data and configs
 tax_df = pd.read_csv('https://docs.google.com/spreadsheets/d/1z2wvzHUavp76-IXXPBeVJpkU7irMAzsuru8vSzhyxtk/export?format=csv&gid=2055398816')
-with open('configs/tag_configs.yaml') as fp:
+with open('configs/default_tag_configs.yaml') as fp:
     configs = yaml.safe_load(fp)
 df = pd.read_csv('dumps/data.csv')
 df = df.head(20)
