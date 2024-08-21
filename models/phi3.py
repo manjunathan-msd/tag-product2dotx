@@ -1,6 +1,8 @@
 # Import libraries
 import time
 import os
+import json
+import pandas as pd
 from transformers import AutoModelForCausalLM, AutoTokenizer, AutoProcessor, pipeline
 from utils.image import download
 
@@ -9,7 +11,7 @@ from utils.image import download
 Phi3 wrapper to use it as agent in workflow
 '''
 class Phi3:
-    def __init__(self, max_new_tokens: int = 256):
+    def __init__(self, **configs):
         cache_dir = os.path.join('pretrained_models', 'phi3')
         os.makedirs(cache_dir, exist_ok=True)
         # Declare tokenizer, model and model
@@ -33,29 +35,46 @@ class Phi3:
             tokenizer=tokenizer, 
         )
         # Define generation configurations
-        self.generation_args = { 
-            "max_new_tokens": max_new_tokens, 
-            "return_full_text": False, 
-            "temperature": 0.2, 
-            "do_sample": False, 
-        } 
-
-    def __call__(self, prompt: str, image_url: str):
+        self.generation_args = configs 
+        
+    def get_context(self, data: dict, cols: list):
+        text = ''
+        for col in cols:
+            if not pd.isna(data[col]):
+                text += f'{col} - {data[col]}\n'
+        return text
+    
+    def __call__(self, taxonomy_dict: dict, data_dict: dict, metadata_dict: dict):
+        prompt = taxonomy_dict['prompt']
+        note = taxonomy_dict['note']
+        context = self.get_context(data_dict, taxonomy_dict['default_text_cols'])
+        if taxonomy_dict['inference_mode'] == 'attribute' or taxonomy_dict['inference_mode'] == 'presets':
+            if taxonomy_dict['node_type'] == 'NA':
+                attribute = taxonomy_dict['breadcrumb'].split('>')[-1].strip()
+                labels = taxonomy_dict['labels']
+                prompt = prompt.format(metadata=json.dumps(metadata_dict, indent=4), context=context, note=note, attribute=attribute, labels=labels)
+            else:
+                labels = taxonomy_dict['labels']
+                prompt = prompt.format(context=context, labels=labels)
+        elif taxonomy_dict['inference_mode'] == 'category':
+            pass
+        else:
+            raise ValueError("Invalid inference mode!")
         start = time.time()
         messages = [ 
             {"role": "system", "content": "You are a helpful assistant who is an expert of inventory management."}, 
             {"role": "user", "content": prompt}, 
         ]
-        gen_text = self.pipeline(messages, **self.generation_args)[0]['generated_text'].strip()
-        end = time.time()
-        latency = end - start
+        gen_text = self.pipeline(messages, **self.generation_args)[0]['generated_text'][-1]['content'].strip()
         input_tokens = len(self.tokenizer.apply_chat_template(messages, tokenize=True, add_generation_prompt=True, return_tensors="pt")[0])
         output_tokens = len(self.tokenizer(gen_text, return_tensors='pt')['input_ids'][0])
+        end = time.time()
+        latency = end - start
         return gen_text, input_tokens, output_tokens, latency
     
 
 class Phi3Vision:
-    def __init__(self, max_new_tokens: int = 256):
+    def __init__(self, **configs):
         cache_dir = os.path.join('pretrained_models', 'phi3_vision')
         os.makedirs(cache_dir, exist_ok=True)
         # Declare model and processor
@@ -72,26 +91,55 @@ class Phi3Vision:
             cache_dir=cache_dir,
             trust_remote_code=True
         )
-        # Generation configs
-        self.generation_args = { 
-            "max_new_tokens": max_new_tokens, 
-            "temperature": 0.2, 
-            "do_sample": False
-        } 
+        # Define generation configurations
+        self.generation_args = configs 
     
-    def __call__(self, prompt: str, image_url: str):
-        # message template
-        messages = [ 
-            {"role": "system", "content": "You are a helpful assistant who is an expert of inventory management."},
-            {"role": "user", "content": "<|image_1|>\nUse the image to get useful information to perform the task decribed below."},
-            {"role": "user", "content": prompt},
-        ] 
-        # Download image
-        image = download(image_url)
+    def get_context(self, data: dict, cols: list):
+        text = ''
+        for col in cols:
+            if not pd.isna(data[col]):
+                text += f'{col} - {data[col]}\n'
+        return text
+    
+    def get_images(self, data: dict, cols: list):
+        images = []
+        for col in cols:
+            if not pd.isna(col):
+                try:
+                    image = download(data[col])
+                    images.append(image)
+                except Exception as err:
+                    pass
+        return images
+    
+    def __call__(self, taxonomy_dict: dict, data_dict: dict, metadata_dict: dict):
+        prompt = taxonomy_dict['prompt']
+        note = taxonomy_dict['note']
+        context = self.get_context(data_dict, taxonomy_dict['default_text_cols'])
+        images = self.get_images(data_dict, taxonomy_dict['default_image_cols'])
+        if taxonomy_dict['inference_mode'] == 'attribute' or taxonomy_dict['inference_mode'] == 'presets':
+            if taxonomy_dict['node_type'] == 'NA':
+                attribute = taxonomy_dict['breadcrumb'].split('>')[-1].strip()
+                labels = taxonomy_dict['labels']
+                prompt = prompt.format(metadata=json.dumps(metadata_dict, indent=4), context=context, note=note, attribute=attribute, labels=labels)
+            else:
+                labels = taxonomy_dict['labels']
+                prompt = prompt.format(context=context, labels=labels)
+        elif taxonomy_dict['inference_mode'] == 'category':
+            pass
+        else:
+            raise ValueError("Invalid inference mode!")
         start = time.time()
+        # Message template
+        messages = [ 
+            {"role": "system", "content": "You are a helpful assistant who is an expert of inventory management."}
+        ] 
+        for i, image in enumerate(images):
+            messages.append({"role": "user", "content": f"<|image_{i+1}|>\nExtract useful information from the image to perform the task described below."})
+        messages.append({"role": "user", "content": prompt})
         # Prepare inputs
         prompt = self.processor.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        inputs = self.processor(prompt, [image], return_tensors="pt").to("cuda") 
+        inputs = self.processor(prompt, images, return_tensors="pt").to("cuda") 
         generate_ids = self.model.generate(
             **inputs, 
             eos_token_id=self.processor.tokenizer.eos_token_id, 

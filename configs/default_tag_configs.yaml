@@ -1,12 +1,12 @@
 model:
-  name: FashionAPI
+  name: Phi3Vision
   parameters:
-    max_new_tokens: 64
+    max_new_tokens: 256
 prompts:
   non_leaf_prompt_path: prompts/non_leaf_classification.txt
   leaf_prompt_path: prompts/leaf_classification_attribute.txt
   note: prompts/note.txt
 inference:
   level: attribute # level can be 'attribute', 'category' and 'presets'
-  text_cols: []
-  image_cols: []
+  text_cols: Product Name,ocr_txt
+  image_cols: Image URL (F),Image URL (L),Image URL (R),Image URL (B)

@@ -28,8 +28,8 @@ class Tagger:
             raise ValueError("Invalid LLM name!")
         # Load inference configs
         self.mode = configs['inference']['level']
-        self.text_cols = configs['inference']['text_cols']
-        self.image_cols = configs['inference']['image_cols']
+        self.text_cols = [x.strip() for x in configs['inference']['text_cols'].split(',')] if configs['inference']['text_cols'] is not None else []
+        self.image_cols = [x.strip() for x in configs['inference']['image_cols'].split(',')] if configs['inference']['image_cols'] is not None else []
         # Read default prompts
         self.prompts = {}
         with open(configs['prompts']['leaf_prompt_path']) as fp:
@@ -60,17 +60,6 @@ class Tagger:
         else:
             raise ValueError("Invalid attribute to remove!")
 
-    # def get_context(self, row: dict, text_cols: list):
-    #     text = ''
-    #     for col in text_cols:
-    #         if not pd.isna(row[col]):         
-    #             text += col + ': ' + row[col] + '\n'
-    #     return text
-    
-    # def get_image(self, row: dict, image_col: str):
-    #     image_url = row[image_col]
-    #     return image_url 
-
     # Tag data
     def tag(self, data_dict: dict):
         # Store the tags
@@ -94,13 +83,15 @@ class Tagger:
                         prompt = self.additional_prompts[name]
                     else:
                         prompt = self.prompts['non_leaf_prompt']
-                    # Prepare taxonomy_dict and metdata_dict
+                    # Prepare taxonomy_dict and metadata_dict
                     taxonomy_dict = {
                         'breadcrumb': name,
                         'labels': labels,
                         'prompt': prompt,
+                        'note': self.prompts['note'],
                         'default_text_cols': self.text_cols,
-                        'deafault_image_cols': self.image_cols,
+                        'default_image_cols': self.image_cols,
+                        'node_type': ptr.get('node_type'),
                         'inference_mode': self.mode
                     }
                     metadata_dict = ptr.get('metadata')
@@ -144,19 +135,21 @@ class Tagger:
                         for attr in ptr.get('children'):
                             # Prepare taxonomy_dict and metadata_dict
                             taxonomy_dict = {
-                                'breadcrumb': attr,
+                                'breadcrumb': attr.get('name'),
                                 'labels': attr.get('labels'),
                                 'prompt': self.prompts['leaf_prompt'],
+                                'note': self.prompts['note'],
                                 'default_text_cols': self.text_cols,
-                                'deafault_image_cols': self.image_cols,
+                                'default_image_cols': self.image_cols,
+                                'node_type': ptr.get('node_type'),
                                 'inference_mode': self.mode
                             }
-                            metadata_dict = attr.get('metdata')
+                            metadata_dict = attr.get('metadata')
                             # Use the model for inference
                             resp, input_tokens, output_tokens, latency = self.model(taxonomy_dict, data_dict, metadata_dict)
                             # For classification task, get the most similar label and for extraction task no postprocessing is needed
-                            if attr.get('Classification / Extraction') == 'Classification':
-                                label = get_most_similar(labels, resp)
+                            if attr.get('Classification / Extraction') == 'Classification' and resp!='Not specified':
+                                label = get_most_similar(attr.get('labels'), resp)
                             else:
                                 label = resp
                             # Store the attribute's result
@@ -172,17 +165,19 @@ class Tagger:
                         ptr = None
                     # If current model is 'category'
                     elif self.mode == 'category':
-                        # Prepare taxonomy and metdata dict
+                        # Prepare taxonomy and metadata dict
                         taxonomy_dict, metadata_dict = {}, {}
                         # Traverse all the attributes and prepare it
                         for attr in ptr.get('children'):
                             attribute = attr.get('name').split(' > ')[-1].strip()
                             taxonomy_dict[attribute] = {
-                                'breadcrumb': attr,
+                                'breadcrumb': attr.get('name'),
                                 'labels': attr.get('labels'),
                                 'prompt': self.prompts['leaf_prompt'],
+                                'note': self.prompts['note'],
                                 'default_text_cols': self.text_cols,
-                                'deafault_image_cols': self.image_cols,
+                                'default_image_cols': self.image_cols,
+                                'node_type': ptr.get('node_type'),
                                 'inference_mode': self.mode
                             } 
                             metadata_dict[attribute] = attr.get('metadata')
@@ -215,14 +210,16 @@ class Tagger:
                                 prompt = self.prompts['leaf_prompt']
                             # Preapre taxonomy_dict and metadata_dict
                             taxonomy_dict = {
-                                'breadcrumb': attr,
+                                'breadcrumb': attr.get('name'),
                                 'labels': attr.get('labels'),
                                 'prompt': prompt,
+                                'note': self.prompts['note'],
                                 'default_text_cols': self.text_cols,
-                                'deafault_image_cols': self.image_cols,
+                                'default_image_cols': self.image_cols,
+                                'node_type': ptr.get('node_type'),
                                 'inference_mode': self.mode
                             }
-                            metadata_dict = attr.get('metdata')
+                            metadata_dict = attr.get('metadata')
                             # Get inference from the model
                             if name in self.model_taxonomy:
                                 temp_model = globals()[self.model_taxonomy[name]]()
@@ -231,8 +228,8 @@ class Tagger:
                             else:
                                 resp, input_tokens, output_tokens, latency = self.model(taxonomy_dict, data_dict, metadata_dict)
                             # For classification task get most similar label, no postprocessing is needed for extraction
-                            if attr.get('Classification / Extraction') == 'Classification':
-                                label = get_most_similar(labels, resp)
+                            if attr.get('Classification / Extraction') == 'Classification' and resp != 'Not specified':
+                                label = get_most_similar(attr.get('labels'), resp)
                             else:
                                 label = resp
                             # Store the attribute's result
@@ -252,7 +249,7 @@ class Tagger:
         # Return all tags for a record
         return res          
 
-    def __call__(self, df: pd.DataFrame, note: str, model_taxonomy: dict =  None, additional_prompts: dict = None):
+    def __call__(self, df: pd.DataFrame, model_taxonomy: dict =  None, additional_prompts: dict = None):
         # For present model model_taxonomy is needed
         if self.mode == 'presets':
             if model_taxonomy is None:
