@@ -1,4 +1,5 @@
 # Import librraies
+import traceback
 import numpy as np
 import json
 import pandas as pd
@@ -98,10 +99,10 @@ class Tagger:
                     # Get the model for the node and use the model for inference
                     if self.mode == 'presets' and name in self.model_taxonomy:
                         # Get the preset model name and it's parameters
-                        additional_model_name = self.model_taxonomy['name']['model_name']
-                        additrional_model_parameters = self.model['name']['parameters']
+                        additional_model_name = self.model_taxonomy[name]['model_name']
+                        additional_model_parameters = self.model_taxonomy[name]['parameters']
                         # Declare the model
-                        temp_model = globals()[additional_model_name](**additrional_model_parameters)
+                        temp_model = globals()[additional_model_name](**additional_model_parameters)
                         # Inference the model
                         resp, input_tokens, output_tokens, latency = temp_model(taxonomy_dict, data_dict, metadata_dict)
                         # Delete the model
@@ -110,7 +111,7 @@ class Tagger:
                         # Call the default model
                         resp, input_tokens, output_tokens, latency = self.model(taxonomy_dict, data_dict, metadata_dict)   
                     # If result is 'Not specified' then there is no point to traverse the tree
-                    if resp == 'Not specified':
+                    if resp.lower().strip() == 'not specified':
                         res[f'L{depth}'] = 'Not specified'
                         return res
                     # Get the most similar label of response using fuzzy-matching
@@ -148,9 +149,11 @@ class Tagger:
                             # Use the model for inference
                             resp, input_tokens, output_tokens, latency = self.model(taxonomy_dict, data_dict, metadata_dict)
                             # For classification task, get the most similar label and for extraction task no postprocessing is needed
-                            if attr.get('Classification / Extraction') == 'Classification' and resp!='Not specified':
+                            if attr.get('Classification / Extraction') == 'Classification' and resp.lower().strip() != 'not specified':
                                 label = get_most_similar(attr.get('labels'), resp)
                             else:
+                                if resp.lower().strip() == 'not specified':
+                                    resp = 'Not specified'
                                 label = resp
                             # Store the attribute's result
                             temp[attr.get('name').split(' > ')[-1]] = {
@@ -203,6 +206,8 @@ class Tagger:
                         temp = {}
                         # Traverse all the attributes
                         for attr in ptr.get('children'):
+                            # Get name
+                            name = attr.get('name')
                             # Get the prompt
                             if name in self.additional_prompts:
                                 prompt = self.additional_prompts[name]
@@ -222,15 +227,23 @@ class Tagger:
                             metadata_dict = attr.get('metadata')
                             # Get inference from the model
                             if name in self.model_taxonomy:
-                                temp_model = globals()[self.model_taxonomy[name]]()
+                                # Get the preset model name and it's parameters
+                                additional_model_name = self.model_taxonomy[name]['model_name']
+                                additional_model_parameters = self.model_taxonomy[name]['parameters']
+                                # Declare the model
+                                temp_model = globals()[additional_model_name](**additional_model_parameters)
+                                # Inference using the model
                                 resp, input_tokens, output_tokens, latency = temp_model(taxonomy_dict, data_dict, metadata_dict)
                                 del temp_model
                             else:
+                                # Inference using default model
                                 resp, input_tokens, output_tokens, latency = self.model(taxonomy_dict, data_dict, metadata_dict)
                             # For classification task get most similar label, no postprocessing is needed for extraction
-                            if attr.get('Classification / Extraction') == 'Classification' and resp != 'Not specified':
+                            if attr.get('Classification / Extraction') == 'Classification' and resp.lower().strip() != 'not specified':
                                 label = get_most_similar(attr.get('labels'), resp)
                             else:
+                                if resp.lower().strip() == 'not specified':
+                                    resp = 'Not specified'
                                 label = resp
                             # Store the attribute's result
                             temp[attr.get('name').split(' > ')[-1]] = {
@@ -268,7 +281,7 @@ class Tagger:
                 row['results'] = tags
                 res.append(row)
             except Exception as err:
-                print(err)
+                print(traceback.format_exc())
         res = pd.DataFrame(res)
         # Delete the artifacts of the class
         if self.mode == 'presets':

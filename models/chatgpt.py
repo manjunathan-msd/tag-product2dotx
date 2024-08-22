@@ -3,8 +3,9 @@ import time
 from dotenv import load_dotenv
 load_dotenv()
 import json
+import pandas as pd
 from openai import OpenAI
-from utils.image import encode_image
+from utils.image import encode_image, download
 
 
 
@@ -46,33 +47,80 @@ It suppport gpt-4o-mini, gpt-4o and gpt-3.5
 - model_name: Name of the model which will be used for inferencing
 '''     
 class ChatGPT:
-    def __init__(self, model_name: str = 'gpt-4o-mini'):
-        self.model_name = model_name
+    def __init__(self, **configs):
+        # Get model name of ChatGPT
+        self.model_name = configs['model_name']
+        if 'text_cols' in configs:
+            self.text_cols = [x.strip() for x in configs['text_cols'].split(',')]
+        else:
+            self.text_cols = None
+        if 'image_cols' in configs:
+            self.image_cols = [x.strip() for x in configs['image_cols'].split(',')]
+        else:
+            self.image_cols = None
         self.client = OpenAI()
+    
+    def get_context(self, data: dict, cols: list):
+        text = ''
+        for col in cols:
+            if not pd.isna(data[col]):
+                text += f'{col} - {data[col]}\n'
+        return text
+    
+    def get_images(self, data: dict, cols: list):
+        images = []
+        for col in cols:
+            if not pd.isna(col):
+                try:
+                    image = encode_image(data[col])
+                    images.append(image)
+                except Exception as err:
+                    pass
+        return images
         
-    def __call__(self, prompt: str, image_url: str = None):
+    def __call__(self, taxonomy_dict: dict, data_dict: dict, metadata_dict: dict):
+        prompt = taxonomy_dict['prompt']
+        note = taxonomy_dict['note']
+        context = self.get_context(data_dict, taxonomy_dict['default_text_cols'] if self.text_cols is None else self.text_cols)
+        images = self.get_images(data_dict, taxonomy_dict['default_image_cols'] if self.image_cols is None else self.image_cols)
+        if taxonomy_dict['inference_mode'] == 'attribute' or taxonomy_dict['inference_mode'] == 'presets':
+            if taxonomy_dict['node_type'] == 'NA':
+                attribute = taxonomy_dict['breadcrumb'].split('>')[-1].strip()
+                labels = taxonomy_dict['labels']
+                prompt = prompt.format(metadata=json.dumps(metadata_dict, indent=4), context=context, note=note, attribute=attribute, labels=labels)
+            else:
+                labels = taxonomy_dict['labels']
+                prompt = prompt.format(context=context, labels=labels)
+        elif taxonomy_dict['inference_mode'] == 'category':
+            pass
+        else:
+            raise ValueError("Invalid inference mode!")
         start = time.time()
-        payload = [
+        payload = []
+        images = self.get_images(data_dict, taxonomy_dict['default_image_cols'])
+        for image in images:
+            if self.model_name in ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']:
+                payload.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{image}",
+                            "detail": "high"
+                        }
+                    }
+                )
+                payload.append(
+                    {
+                        "type": "text",
+                        "text": "Extract the useful information from the image and keep it in mind to answer the questions defined below."
+                    }
+                )
+        payload.append(
             {
                 "type": "text",
                 "text": prompt
             }
-        ]
-        if image_url and self.model_name in ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']:
-            try:
-                image_url = encode_image(image_url)
-            except Exception as err:
-                print("Image URL is not accessible!")
-                return 'Not specified', 'NA', 'NA', 'NA'
-            payload.append(
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{image_url}",
-                        "detail": "high"
-                    }
-                }
-            )
+        )
         response = self.client.chat.completions.create(
             model = self.model_name,
             messages = [
@@ -87,3 +135,6 @@ class ChatGPT:
         response = json.loads(response)
         resp, input_tokens, output_tokens, latency = response['choices'][0]['message']['content'], response['usage']['prompt_tokens'], response['usage']['completion_tokens'], end - start
         return resp, input_tokens, output_tokens, latency
+
+
+

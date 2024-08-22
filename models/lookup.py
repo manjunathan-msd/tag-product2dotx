@@ -1,25 +1,120 @@
 # Import libraries
+import time
+import re
+import pandas as pd
 from utils.string import tokenize, stem_words
 
-class TaxonomyLookup:
-    def __init__(self, word_dict: dict, return_type: str = 'single'):
-        self.word_dict = {k: [x.strip() for x in v.split()] for k, v in word_dict.items()}
-        self.return_type = return_type
+
+
+'''
+Class which can do keyword search in a given context.
+- configs:
+    - lookup_table: A dictionary which has label and list of keywords as pair.
+    - text_cols: Columns of the data should be considered for lookup.
+'''
+class KeywordLookup:
+    def __init__(self, **configs):
+        self.lookup_table = configs['lookup_table']
+        # If any speciic columns of data needs to be checked, then the column name(s) should be passed as text_cols
+        if 'text_cols' in configs:
+            self.text_cols = configs['text_cols']
+        else:
+            self.text_cols = None
     
-    def __call__(self, prompt: str, image_url: str = None):
+    def get_context(self, data: dict, cols: list):
+        text = ''
+        for col in cols:
+            if not pd.isna(data[col]):
+                text += f'{col} - {data[col]}\n'
+        return text
+    
+    def __call__(self, taxonomy_dict: dict, data_dict: dict, metadata_dict: dict):
+        start = time.time()
+        # Check inference mode
+        if taxonomy_dict['inference_mode'] == 'category':
+            raise ValueError("Inference Mode - 'category' can't be used!")
+        # Check that there is any preset text_cols or not
+        if self.text_cols is None:
+            self.text_cols = taxonomy_dict['default_text_cols']
+        # Get context of the data
+        context = self.get_context(data_dict, self.text_cols)
+        # List to store result
         res = []
-        tokenized_text = tokenize(prompt)
+        # Tokenize context
+        tokenized_text = tokenize(context)
         tokenized_text = list(set(stem_words(tokenized_text)))
-        for k, vals in self.word_dict.items():
+        # Check for match 
+        for k, vals in self.lookup_table.items():
             vals = list(set(stem_words(vals)))
             for v in vals:
                 if v in tokenized_text:
                     res.append(k)
-        if self.return_type == 'single':
-            return res[0], 'NA', 'NA', 'NA'
+                    break
+        # Filter invalid predictions 
+        labels = [x.lower().strip() for x in taxonomy_dict['labels']]
+        res = [x for x in res if x.lower().strip() in labels]
+        # Return the result depending on the metadata
+        end = time.time()
+        if 'Single' in metadata_dict['Single Value / Multi Value']:
+            return res[0] if len(res) >= 1 else 'Not specified', 0, 0, end - start
         else:
-            return res, 'NA', 'NA', 'NA'
+            return ','.join(res) if len(res) >= 1 else 'Not specified', 0, 0, end - start
             
                     
+                    
+class Lookup:
+    def __init__(self, **configs):
+        if 'text_cols' in configs:
+            self.text_cols = configs['text_cols']
+        else:
+            self.text_cols = None
+    
+    def get_context(self, data: dict, cols: list):
+        text = ''
+        for col in cols:
+            if not pd.isna(data[col]):
+                text += f'{col} - {data[col]}\n'
+        return text
+    
+    def __call__(self, taxonomy_dict: dict, data_dict: dict, metadata_dict: dict):
+        start = time.time()
+        # Check inference mode
+        if taxonomy_dict['inference_mode'] == 'category':
+            raise ValueError("Inference Mode - 'category' can't be used!")
+        # Check that there is any preset text_cols or not
+        if self.text_cols is None:
+            self.text_cols = taxonomy_dict['default_text_cols']
+        # Get context of the data
+        context = self.get_context(data_dict, self.text_cols)
+        context = context.lower()
+        # List to store result
+        res = []
+        # Check for match 
+        for x in taxonomy_dict['labels']:
+            pattern = r'\b' + re.escape(x.lower().strip()) + r'\b'
+            if re.search(pattern, context):
+                res.append(x.strip())
+        end = time.time()
+        # Return the result depending on the metadata
+        if 'Single' in metadata_dict['Single Value / Multi Value']:
+            return res[0] if len(res) >= 1 else 'Not specified', 0, 0, end - start
+        else:
+            return ','.join(res) if len(res) >= 1 else 'Not specified', 0, 0, end - start
         
+            
+'''
+The model can do a Direct Mapping of a input feature and output feature.
+'''
+class DirectLookup:
+    def __init__(self, **configs):
+        try:
+            self.lookup_col =  configs['lookup_col']
+        except Exception as err:
+            print("For DiectLoopkup, 'lookup_col' must be passed as parameter!")
         
+    def __call__(self, taxonomy_dict: dict, data_dict: dict, metadata_dict: dict):
+        start = time.time()
+        if taxonomy_dict['inference_mode'] == 'category':
+            raise ValueError("Can't use this model in 'category' mode.")
+        end = time.time()
+        return data_dict[self.lookup_col] if not pd.isna(data_dict[self.lookup_col]) else 'Not specified', 0, 0, end - start

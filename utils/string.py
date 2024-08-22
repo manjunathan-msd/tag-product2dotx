@@ -11,8 +11,8 @@ from nltk.stem import PorterStemmer
 
 # Get most similar string
 def get_most_similar(string_list: list, word: str):
-    similar_word, _ = process.extractOne(word, string_list)
-    return similar_word
+    similar_word, score = process.extractOne(word, string_list)
+    return similar_word if score >= 70 else 'Not specified'
 
 # Postprocessing LLM response
 def postprocessing_llm_response(text: str):
