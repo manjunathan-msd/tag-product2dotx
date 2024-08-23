@@ -70,7 +70,15 @@ def remove_not_specified(json_str):
     except json.JSONDecodeError:
         print("Error", json_str)
         return {}
-    cleaned_dict = {k: v for k, v in attr_dict.items() if str(v).lower().strip() not in  ["not specified","not applicable","na","not available","not mentioned"]}
+
+    print(attr_dict)
+    try:
+        cleaned_dict = {k: v for k, v in attr_dict.items() if str(v).lower().strip() not in  ["not specified","not applicable","na","not available","not mentioned"]}
+    except:
+        attr_dict=ast.literal_eval(attr_dict)
+        cleaned_dict = {k: v for k, v in attr_dict.items() if str(v).lower().strip() not in  ["not specified","not applicable","na","not available","not mentioned"]}
+
+
     return cleaned_dict
 
 def transform_breadcrumb(breadcrumb):

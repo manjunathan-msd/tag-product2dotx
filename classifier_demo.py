@@ -5,11 +5,10 @@ from models.hpt_model import HPT
 #Tagger
 from tagger.tagger import Tagger2dotX
 from utils.postprocess_utils import convert_demosite_format
+from models.hpt_model import HPT
 
-#Initializing Model:
-agent_llm=HPT()
-
-classifier=Tagger2dotX(use_meta=True)
+agent=HPT()
+classifier=Tagger2dotX(agent=agent,use_meta=True)
 
 def apply_classifier(row):
     result = classifier(row)

@@ -25,7 +25,7 @@ check_conda_installed() {
 check_conda_installed
 
 # Clone the HPT repository
-git clone https://github.com/HyperGAI/HPT.git
+git clone https://github.com/manjunathan-msd/HPT.git
 
 # Change directory to HPT
 cd HPT || exit
