@@ -1,4 +1,5 @@
 # Import librraies
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import traceback
 import numpy as np
 import json
@@ -115,7 +116,10 @@ class Tagger:
                         res[f'L{depth}'] = 'Not specified'
                         return res
                     # Get the most similar label of response using fuzzy-matching
-                    label = get_most_similar(labels, resp)
+                    label = []
+                    for l in resp.split(','):
+                        label.append(get_most_similar(labels, l))
+                    label = ', '.join(label)
                     # Store the result of the depth
                     res[f'L{depth}'] = {
                         'Label': label,
@@ -150,7 +154,14 @@ class Tagger:
                             resp, input_tokens, output_tokens, latency = self.model(taxonomy_dict, data_dict, metadata_dict)
                             # For classification task, get the most similar label and for extraction task no postprocessing is needed
                             if attr.get('Classification / Extraction') == 'Classification' and resp.lower().strip() != 'not specified':
-                                label = get_most_similar(attr.get('labels'), resp)
+                                label = []
+                                for l in resp.split(','):
+                                    label.append(get_most_similar(attr.get('labels'), l))
+                                label = [x for x in label if x != 'Not specified']
+                                if len(label) == 0:
+                                    label = 'Not specified'
+                                else:
+                                    label = ', '.join(label)
                             else:
                                 if resp.lower().strip() == 'not specified':
                                     resp = 'Not specified'
@@ -240,7 +251,14 @@ class Tagger:
                                 resp, input_tokens, output_tokens, latency = self.model(taxonomy_dict, data_dict, metadata_dict)
                             # For classification task get most similar label, no postprocessing is needed for extraction
                             if attr.get('Classification / Extraction') == 'Classification' and resp.lower().strip() != 'not specified':
-                                label = get_most_similar(attr.get('labels'), resp)
+                                label = []
+                                for l in resp.split(','):
+                                    label.append(get_most_similar(attr.get('labels'), l))
+                                label = [x for x in label if x != 'Not specified']
+                                if len(label) == 0:
+                                    label = 'Not specified'
+                                else:
+                                    label = ', '.join(label)
                             else:
                                 if resp.lower().strip() == 'not specified':
                                     resp = 'Not specified'
@@ -262,6 +280,16 @@ class Tagger:
         # Return all tags for a record
         return res          
 
+    def process_row(self, row, tag_function):
+        try:
+            tags = tag_function(row)
+            tags = json.dumps(tags, indent=4)
+            row['results'] = tags
+            return row
+        except Exception as err:
+            print(traceback.format_exc())
+            return None
+    
     def __call__(self, df: pd.DataFrame, model_taxonomy: dict =  None, additional_prompts: dict = None):
         # For present model model_taxonomy is needed
         if self.mode == 'presets':
@@ -274,14 +302,12 @@ class Tagger:
         # List to store tags
         res = []
         # Process all records
-        for row in tqdm(df.to_dict(orient='records'), desc='Inferencing', total=df.shape[0]):
-            try:
-                tags = self.tag(row)
-                tags = json.dumps(tags, indent=4)
-                row['results'] = tags
-                res.append(row)
-            except Exception as err:
-                print(traceback.format_exc())
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [executor.submit(self.process_row, row, self.tag) for row in df.to_dict(orient='records')]
+            for future in tqdm(as_completed(futures), desc='Inferencing', total=df.shape[0]):
+                result = future.result()
+                if result is not None:
+                    res.append(result)
         res = pd.DataFrame(res)
         # Delete the artifacts of the class
         if self.mode == 'presets':

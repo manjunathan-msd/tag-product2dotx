@@ -1,11 +1,12 @@
 # Import libraries
 import time
+import gc
 from dotenv import load_dotenv
 load_dotenv()
 import json
 import pandas as pd
 from openai import OpenAI
-from utils.image import encode_image, download
+from utils.image import encode_image
 
 
 
@@ -70,7 +71,7 @@ class ChatGPT:
     def get_images(self, data: dict, cols: list):
         images = []
         for col in cols:
-            if not pd.isna(col):
+            if not pd.isna(data[col]):
                 try:
                     image = encode_image(data[col])
                     images.append(image)
@@ -82,7 +83,6 @@ class ChatGPT:
         prompt = taxonomy_dict['prompt']
         note = taxonomy_dict['note']
         context = self.get_context(data_dict, taxonomy_dict['default_text_cols'] if self.text_cols is None else self.text_cols)
-        images = self.get_images(data_dict, taxonomy_dict['default_image_cols'] if self.image_cols is None else self.image_cols)
         if taxonomy_dict['inference_mode'] == 'attribute' or taxonomy_dict['inference_mode'] == 'presets':
             if taxonomy_dict['node_type'] == 'NA':
                 attribute = taxonomy_dict['breadcrumb'].split('>')[-1].strip()
@@ -97,9 +97,10 @@ class ChatGPT:
             raise ValueError("Invalid inference mode!")
         start = time.time()
         payload = []
-        images = self.get_images(data_dict, taxonomy_dict['default_image_cols'])
-        for image in images:
-            if self.model_name in ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']:
+        # images = self.get_images(data_dict, taxonomy_dict['default_image_cols'])
+        if self.model_name in ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']:
+            images = self.get_images(data_dict, taxonomy_dict['default_image_cols'] if self.image_cols is None else self.image_cols)
+            for image in images:
                 payload.append(
                     {
                         "type": "image_url",

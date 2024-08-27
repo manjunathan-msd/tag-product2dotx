@@ -1,9 +1,12 @@
 # import libraries
+import cachetools
 import requests
 from io import BytesIO
 import base64
 from PIL import Image
 
+# Declare a cache for the encoding
+base64_cache = cachetools.LRUCache(maxsize=10)
 
 
 # Function to download image
@@ -11,7 +14,9 @@ def download(image_url: str):
     image = Image.open(requests.get(image_url, stream=True).raw)
     return image
 
+
 # Function to download and encode image
+@cachetools.cached(base64_cache)
 def encode_image(image_url: str):
     # Download the image
     response = requests.get(image_url)

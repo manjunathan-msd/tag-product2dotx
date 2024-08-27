@@ -3,8 +3,5 @@ import pandas as pd
 from fill_taxonomy.utils import FillMetadata
 
 # Read taxonomy
-taxonomy = pd.read_csv('https://docs.google.com/spreadsheets/d/14QL8oscsg_Pdl2hA6dmNcBk6TwwCLFgA5aopxW4bYVc/export?format=csv&gid=412225439')
-taxonomy.dropna(inplace=True)
-obj = FillMetadata()
-taxonomy = obj(taxonomy)
-taxonomy.to_csv('Champagne & Sparkling Wine_Taxonomy.csv', index=False)
+df = pd.read_csv('/home/ubuntu/efs/users/ankur/tag-product2dotx/dumps/fairprice_beer_hit_remaining_iamge_count_1.csv')
+print(df.shape)

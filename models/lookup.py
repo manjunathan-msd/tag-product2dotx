@@ -1,8 +1,15 @@
 # Import libraries
 import time
+from dotenv import load_dotenv
+load_dotenv()
+from cachetools import LRUCache
+from cachetools import cached
 import re
+import json
 import pandas as pd
 from utils.string import tokenize, stem_words
+from utils.image import encode_image
+from openai import OpenAI
 
 
 
@@ -20,6 +27,7 @@ class KeywordLookup:
             self.text_cols = configs['text_cols']
         else:
             self.text_cols = None
+        self.cache = LRUCache(maxsize=32)
     
     def get_context(self, data: dict, cols: list):
         text = ''
@@ -99,7 +107,7 @@ class Lookup:
         if 'Single' in metadata_dict['Single Value / Multi Value']:
             return res[0] if len(res) >= 1 else 'Not specified', 0, 0, end - start
         else:
-            return ','.join(res) if len(res) >= 1 else 'Not specified', 0, 0, end - start
+            return ', '.join(res) if len(res) >= 1 else 'Not specified', 0, 0, end - start
         
             
 '''
@@ -118,3 +126,91 @@ class DirectLookup:
             raise ValueError("Can't use this model in 'category' mode.")
         end = time.time()
         return data_dict[self.lookup_col] if not pd.isna(data_dict[self.lookup_col]) else 'Not specified', 0, 0, end - start
+    
+
+
+'''
+The class can extract output feature from input feature. If the input feature is NaN then extract the feature using ChatGPT.
+'''
+class DirectLookupMeetsChatGPT:
+    def __init__(self, **configs):
+        try:
+            self.client = OpenAI()
+            self.lookup_col = configs['lookup_col']
+            self.prompt_text_cols = configs['promt_text_cols'] if 'prompt_text_cols' in configs.keys() else None
+            self.prompt_image_cols = configs['promt_image_cols'] if 'prompt_image_cols' in configs.keys() else None
+        except Exception as err:
+            print("For DirectLookupMeetsChatGPT, lookup_col is needed as attribute!")
+        
+    def get_context(self, data: dict, cols: list):
+        text = ''
+        for col in cols:
+            if not pd.isna(data[col]):
+                text += f'{col} - {data[col]}\n'
+        return text
+    
+    def get_images(self, data: dict, cols: list):
+        images = []
+        for col in cols:
+            if not pd.isna(col):
+                try:
+                    image = encode_image(data[col])
+                    images.append(image)
+                except Exception as err:
+                    pass
+        return images
+        
+    def __call__(self, taxonomy_dict: dict, data_dict: dict, metadata_dict):
+        start = time.time()
+        self.prompt = taxonomy_dict['prompt']
+        self.prompt_text_cols = self.prompt_text_cols if self.prompt_text_cols is not None else taxonomy_dict['default_text_cols']
+        self.prompt_image_cols = self.prompt_image_cols if self.prompt_image_cols is not None else taxonomy_dict['default_image_cols']
+        if taxonomy_dict['inference_mode'] == 'category':
+            raise ValueError("Can't use this model in 'category' mode.")
+        if not pd.isna(data_dict[self.lookup_col]):
+            resp, input_tokens, output_tokens, latency = data_dict[self.lookup_col], 0, 0, time.time() - start
+        else:
+            context = self.get_context(data_dict, self.prompt_text_cols)
+            images = self.get_images(data_dict, self.prompt_image_cols)
+            payload = []
+            for image in images:
+                payload.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{image}",
+                            "detail": "high"
+                        }
+                    }
+                )
+                payload.append(
+                    {
+                        "type": "text",
+                        "text": "Extract the useful information from the image and keep it in mind to answer the questions defined below."
+                    }
+                )
+            attribute = taxonomy_dict['breadcrumb'].split(' > ')[-1]
+            labels = taxonomy_dict['labels']
+            metadata = metadata_dict
+            self.prompt = self.prompt.format(context=context, attribute=attribute, labels=labels, metadata=metadata)
+            payload.append(
+                {
+                    "type": "text",
+                    "text": self.prompt
+                }
+            )
+            response = self.client.chat.completions.create(
+                model = 'gpt-4o-mini',
+                messages = [
+                    {
+                        "role": "user",
+                        "content": payload
+                    }
+                ]
+            )
+            end = time.time()
+            response = response.json()
+            response = json.loads(response)
+            resp, input_tokens, output_tokens, latency = response['choices'][0]['message']['content'], response['usage']['prompt_tokens'], response['usage']['completion_tokens'], end - start
+        return resp, input_tokens, output_tokens, latency
+       
