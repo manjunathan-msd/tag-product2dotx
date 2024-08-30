@@ -116,10 +116,7 @@ class Tagger:
                         res[f'L{depth}'] = 'Not specified'
                         return res
                     # Get the most similar label of response using fuzzy-matching
-                    label = []
-                    for l in resp.split(','):
-                        label.append(get_most_similar(labels, l))
-                    label = ', '.join(label)
+                    label = get_most_similar(labels, resp)
                     # Store the result of the depth
                     res[f'L{depth}'] = {
                         'Label': label,
@@ -187,14 +184,14 @@ class Tagger:
                             taxonomy_dict[attribute] = {
                                 'breadcrumb': attr.get('name'),
                                 'labels': attr.get('labels'),
-                                'prompt': self.prompts['leaf_prompt'],
-                                'note': self.prompts['note'],
-                                'default_text_cols': self.text_cols,
-                                'default_image_cols': self.image_cols,
-                                'node_type': ptr.get('node_type'),
-                                'inference_mode': self.mode
                             } 
                             metadata_dict[attribute] = attr.get('metadata')
+                        taxonomy_dict['prompt'] = self.prompts['leaf_prompt']
+                        taxonomy_dict['note'] = self.prompts['note']
+                        taxonomy_dict['default_text_cols'] = self.text_cols
+                        taxonomy_dict['default_image_cols'] = self.image_cols,
+                        taxonomy_dict['node_type'] = ptr.get('node_type')
+                        taxonomy_dict['inference_mode'] = self.mode
                         resp, input_tokens, output_tokens, latency = self.model(taxonomy_dict, data_dict, metadata_dict)
                         # Postprocessing the response of LLM
                         resp = postprocessing_llm_response(resp)

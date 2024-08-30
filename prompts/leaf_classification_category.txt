@@ -2,7 +2,7 @@ Details of a product and its taxonomy are given as input. Your task is depending
 Input:
 ```
 Taxonomy:
-{taxonomy}
+{metadata}
 
 Context:
 {context}

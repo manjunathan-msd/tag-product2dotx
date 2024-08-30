@@ -7,6 +7,6 @@ prompts:
   leaf_prompt_path: prompts/leaf_classification_attribute.txt
   note: prompts/note.txt
 inference:
-  level: presets # level can be 'attribute', 'category' and 'presets'
-  text_cols: title,short_description,description,dimension,categories,materials_and_finish
+  level: presets                  # level can be 'attribute', 'category' and 'presets'
+  text_cols: title,short_description,description,dimension,categories,materials_and_finish,price
   image_cols: image_link

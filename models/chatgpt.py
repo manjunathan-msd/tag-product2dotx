@@ -80,26 +80,40 @@ class ChatGPT:
         return images
         
     def __call__(self, taxonomy_dict: dict, data_dict: dict, metadata_dict: dict):
-        prompt = taxonomy_dict['prompt']
-        note = taxonomy_dict['note']
-        context = self.get_context(data_dict, taxonomy_dict['default_text_cols'] if self.text_cols is None else self.text_cols)
-        if taxonomy_dict['inference_mode'] == 'attribute' or taxonomy_dict['inference_mode'] == 'presets':
+        if taxonomy_dict['inference_mode'] == 'category':
+            if taxonomy_dict['node_type'] == 'NA':
+                prompt = taxonomy_dict['prompt']
+                note = taxonomy_dict['note']
+                context = self.get_context(data_dict, taxonomy_dict['default_text_cols'] if self.text_cols is None else self.text_cols)
+                labels = {k: taxonomy_dict[k]['labels'] for k in taxonomy_dict.keys() if isinstance(taxonomy_dict[k], dict)}
+                prompt = prompt.format(metadata=json.dumps(metadata_dict, indent=4), context=context, note=note, labels=json.dumps(labels, indent=4))
+                self.image_cols = taxonomy_dict['default_image_cols'] if self.image_cols is None else self.image_cols
+            else:
+                prompt = taxonomy_dict['prompt']
+                context = self.get_context(data_dict, taxonomy_dict['default_text_cols'] if self.text_cols is None else self.text_cols)
+                labels = taxonomy_dict['labels']
+                prompt = prompt.format(context=context, labels=labels)
+                self.image_cols = taxonomy_dict['default_image_cols'] if self.image_cols is None else self.image_cols
+        elif taxonomy_dict['inference_mode'] == 'attribute' or taxonomy_dict['inference_mode'] == 'presets':
+            prompt = taxonomy_dict['prompt']
+            note = taxonomy_dict['note']
+            context = self.get_context(data_dict, taxonomy_dict['default_text_cols'] if self.text_cols is None else self.text_cols)
             if taxonomy_dict['node_type'] == 'NA':
                 attribute = taxonomy_dict['breadcrumb'].split('>')[-1].strip()
                 labels = taxonomy_dict['labels']
                 prompt = prompt.format(metadata=json.dumps(metadata_dict, indent=4), context=context, note=note, attribute=attribute, labels=labels)
+                self.image_cols = taxonomy_dict['default_image_cols'] if self.image_cols is None else self.image_cols
             else:
                 labels = taxonomy_dict['labels']
                 prompt = prompt.format(context=context, labels=labels)
-        elif taxonomy_dict['inference_mode'] == 'category':
-            pass
+                self.image_cols = taxonomy_dict['default_image_cols'] if self.image_cols is None else self.image_cols
         else:
             raise ValueError("Invalid inference mode!")
         start = time.time()
         payload = []
         # images = self.get_images(data_dict, taxonomy_dict['default_image_cols'])
         if self.model_name in ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']:
-            images = self.get_images(data_dict, taxonomy_dict['default_image_cols'] if self.image_cols is None else self.image_cols)
+            images = self.get_images(data_dict, self.image_cols)
             for image in images:
                 payload.append(
                     {
