@@ -1,6 +1,7 @@
 # Import libraries
 import ast
 import re
+import json
 import pandas as pd
 
 
@@ -22,7 +23,7 @@ def format_result(df: pd.DataFrame):
         else:
             results = row['results']
         row['Breadcrumb'] = results['Breadcrumb']
-        row['Tags'] = results['Tags']
+        row['Tags'] = json.dumps(results['Tags'], indent=4)
         res.append(row)
     res = pd.DataFrame(res)
     res.drop(columns='results', inplace=True)
