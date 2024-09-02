@@ -214,3 +214,13 @@ class DirectLookupMeetsChatGPT:
             resp, input_tokens, output_tokens, latency = response['choices'][0]['message']['content'], response['usage']['prompt_tokens'], response['usage']['completion_tokens'], end - start
         return resp, input_tokens, output_tokens, latency
        
+
+'''
+The class can do lookup based on some other attribute values predicted by other models.
+'''
+class CorrelationLookup:
+    def __init__(self, **configs):
+        pass
+    
+    def __call__(self, taxonomy_dict: dict, data_dict: dict, metadata_dict):
+        return 'Not specified'
