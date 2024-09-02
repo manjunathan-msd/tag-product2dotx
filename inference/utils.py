@@ -7,6 +7,7 @@ import pandas as pd
 from tqdm import tqdm
 from taxonomy_builder.utils import TaxonomyTree
 from utils.string import *
+from utils.misc import *
 from models import *
 
 
@@ -275,7 +276,7 @@ class Tagger:
                     else:
                         raise ValueError("Wrong value of inference mode!")
         # Return all tags for a record
-        return res          
+        return format_tags(res)       
 
     def process_row(self, row, tag_function):
         try:
@@ -306,6 +307,8 @@ class Tagger:
                 if result is not None:
                     res.append(result)
         res = pd.DataFrame(res)
+        # Format results
+        res = format_result(res)
         # Delete the artifacts of the class
         if self.mode == 'presets':
             self.remove('model_taxonomy')
