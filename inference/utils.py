@@ -74,7 +74,13 @@ class Tagger:
             labels = ptr.get('labels')
             # If number of labels is 1 and the task is a Classification task then store the label as the answer
             if len(labels) == 1 and ptr.get('Classification / Extraction') == 'Classification':
-                res[f'L{depth}'] = labels[0]
+                res[f'L{depth}'] = {
+                    'Label': labels[0],
+                    'Input Tokens': 0,
+                    'Output Tokens': 0,
+                    'Latency': 0
+                }
+                depth += 1
                 ptr = ptr.get('children')[0]
             else:
                 # If the current node is a non-leaf node
