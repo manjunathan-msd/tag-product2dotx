@@ -223,4 +223,4 @@ class CorrelationLookup:
         pass
     
     def __call__(self, taxonomy_dict: dict, data_dict: dict, metadata_dict):
-        return 'Not specified'
+        return 'Not specified', 0, 0, 0
