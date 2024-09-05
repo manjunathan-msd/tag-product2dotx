@@ -14,12 +14,12 @@ from openai import OpenAI
 
 
 '''
-Class which can do keyword search in a given context.
+Class which can do keyword search in a given context using stemming and tokenization
 - configs:
     - lookup_table: A dictionary which has label and list of keywords as pair.
     - text_cols: Columns of the data should be considered for lookup.
 '''
-class KeywordLookup:
+class KeywordStemLookup:
     def __init__(self, **configs):
         self.lookup_table = configs['lookup_table']
         # If any speciic columns of data needs to be checked, then the column name(s) should be passed as text_cols
@@ -68,6 +68,58 @@ class KeywordLookup:
         else:
             return ','.join(res) if len(res) >= 1 else 'Not specified', 0, 0, end - start
             
+
+'''
+Class which can do keyword search in a given context.
+- configs:
+    - lookup_table: A dictionary which has label and list of keywords as pair.
+    - text_cols: Columns of the data should be considered for lookup.
+'''
+class KeywordStemLookup:
+    def __init__(self, **configs):
+        self.lookup_table = configs['lookup_table']
+        # If any speciic columns of data needs to be checked, then the column name(s) should be passed as text_cols
+        if 'text_cols' in configs:
+            self.text_cols = configs['text_cols']
+        else:
+            self.text_cols = None
+        self.cache = LRUCache(maxsize=32)
+    
+    def get_context(self, data: dict, cols: list):
+        text = ''
+        for col in cols:
+            if not pd.isna(data[col]):
+                text += f'{col} - {data[col]}\n'
+        return text
+    
+    def __call__(self, taxonomy_dict: dict, data_dict: dict, metadata_dict: dict):
+        start = time.time()
+        # Check inference mode
+        if taxonomy_dict['inference_mode'] == 'category':
+            raise ValueError("Inference Mode - 'category' can't be used!")
+        # Check that there is any preset text_cols or not
+        if self.text_cols is None:
+            self.text_cols = taxonomy_dict['default_text_cols']
+        # Get context of the data
+        context = self.get_context(data_dict, self.text_cols)
+        context = context.lower()
+        # List to store result
+        res = []
+        # Check for match 
+        for k, vals in self.lookup_table.items():
+            for v in vals:
+                pattern = r'\b' + re.escape(v.lower().strip()) + r'\b'
+                if re.search(pattern, context):
+                    res.append(k)
+        # Filter invalid predictions 
+        labels = [x.lower().strip() for x in taxonomy_dict['labels']]
+        res = [x for x in res if x.lower().strip() in labels]
+        # Return the result depending on the metadata
+        end = time.time()
+        if 'Single' in metadata_dict['Single Value / Multi Value']:
+            return res[0] if len(res) >= 1 else 'Not specified', 0, 0, end - start
+        else:
+            return ','.join(res) if len(res) >= 1 else 'Not specified', 0, 0, end - start
                     
                     
 class Lookup:
