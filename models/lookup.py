@@ -75,7 +75,7 @@ Class which can do keyword search in a given context.
     - lookup_table: A dictionary which has label and list of keywords as pair.
     - text_cols: Columns of the data should be considered for lookup.
 '''
-class KeywordStemLookup:
+class KeywordLookup:
     def __init__(self, **configs):
         self.lookup_table = configs['lookup_table']
         # If any speciic columns of data needs to be checked, then the column name(s) should be passed as text_cols
