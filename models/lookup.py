@@ -113,7 +113,7 @@ class KeywordLookup:
                     res.append(k)
         # Filter invalid predictions 
         labels = [x.lower().strip() for x in taxonomy_dict['labels']]
-        res = [x for x in res if x.lower().strip() in labels]
+        res = [x for x in set(res) if x.lower().strip() in labels]
         # Return the result depending on the metadata
         end = time.time()
         if 'Single' in metadata_dict['Single Value / Multi Value']:

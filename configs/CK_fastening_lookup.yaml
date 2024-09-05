@@ -1,0 +1,12 @@
+model:
+  name: ChatGPT
+  parameters:
+    model_name: gpt-4o-mini
+prompts:
+  non_leaf_prompt_path: prompts/non_leaf_classification.txt
+  leaf_prompt_path: prompts/leaf_classification_attribute.txt
+  note: prompts/note.txt
+inference:
+  level: presets                  # level can be 'attribute', 'category' and 'presets'
+  text_cols: Ecommerce Name,Ecommerce Flavor Copy
+  image_cols: Image URL 1
