@@ -11,7 +11,6 @@ import pandas as pd
 def format_tags(tags: dict):
     res = {}
     levels = [re.search(r'\bL\d+\b', x).group() for x in tags.keys() if re.search(r'\bL\d+\b', x)]
-    print(levels)
     if 'Label' in tags[levels[-1]].keys() and tags[levels[-1]]['Label'] == 'Not specified':
         res['Breadcrumb'] = ' > '.join(tags[x]['Label'] for x in levels)
         res['Tags'] = {}
