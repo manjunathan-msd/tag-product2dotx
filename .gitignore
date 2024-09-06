@@ -117,7 +117,10 @@ Thumbs.db
 configs.yaml
 Miniconda3-latest-Linux-x86_64.sh
 
-# Unnecessary folders
+# Unnecessary folders and files
 pretrained_models
 logs
 demo_scripts
+temp.py
+demo.py
+*.out
