@@ -1,5 +1,6 @@
 # Import libraries
 import time
+import ast
 import gc
 from dotenv import load_dotenv
 load_dotenv()
@@ -68,6 +69,22 @@ class ChatGPT:
                 text += f'{col} - {data[col]}\n'
         return text
     
+    def get_few_shot(self, few_shot: str):
+        
+        few_shot_dict = ast.literal_eval(few_shot)
+        few_shot_labels = []
+        few_shot_images = []
+        
+        for key in few_shot_dict:
+            try:
+                few_shot_image = encode_image(few_shot_dict[key])
+                few_shot_labels.append(key)
+                few_shot_images.append(few_shot_image)
+            except Exception:
+                continue
+                
+        return zip(few_shot_labels, few_shot_images)
+    
     def get_images(self, data: dict, cols: list):
         images = []
         for col in cols:
@@ -111,8 +128,31 @@ class ChatGPT:
             raise ValueError("Invalid inference mode!")
         start = time.time()
         payload = []
-        # images = self.get_images(data_dict, taxonomy_dict['default_image_cols'])
+        
+        few_shot_samples = None
+        if 'Few_shot' in metadata_dict and metadata_dict['Few_shot'] != 'NA' and isinstance(metadata_dict['Few_shot'], str):
+            few_shot_samples = self.get_few_shot(metadata_dict['Few_shot'])
+            
         if self.model_name in ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']:
+            if few_shot_samples:
+                for few_shot_sample in few_shot_samples:
+                    payload.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{few_shot_sample[1]}",
+                                "detail": "high"
+                            }
+                        }
+                    )
+                    payload.append(
+                        {
+                            "type": "text",
+                            "text": f"This is an example of {few_shot_sample[0]}"
+                        }
+                    )
+                
+            # images = self.get_images(data_dict, taxonomy_dict['default_image_cols'])
             images = self.get_images(data_dict, self.image_cols)
             for image in images:
                 payload.append(

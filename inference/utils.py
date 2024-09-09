@@ -120,7 +120,12 @@ class Tagger:
                         resp, input_tokens, output_tokens, latency = self.model(taxonomy_dict, data_dict, metadata_dict)   
                     # If result is 'Not specified' then there is no point to traverse the tree
                     if resp.lower().strip() == 'not specified':
-                        res[f'L{depth}'] = 'Not specified'
+                        res[f'L{depth}'] = {
+                            'Label': 'Not specified',
+                            'Input Tokens': input_tokens,
+                            'Output Tokens': output_tokens,
+                            'Latency': latency
+                        }
                         return res
                     # Get the most similar label of response using fuzzy-matching
                     label = get_most_similar(labels, resp)
@@ -282,7 +287,7 @@ class Tagger:
                     else:
                         raise ValueError("Wrong value of inference mode!")
         # Return all tags for a record
-        return format_tags(res)       
+        return res
 
     def process_row(self, row, tag_function):
         try:
