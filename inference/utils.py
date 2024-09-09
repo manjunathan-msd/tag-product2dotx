@@ -5,7 +5,7 @@ import numpy as np
 import json
 import pandas as pd
 from tqdm import tqdm
-from taxonomy_builder.utils import TaxonomyTree
+from external_lib.tagproduct2dotx.taxonomy_builder.utils import TaxonomyTree
 from utils.string import *
 from utils.misc import *
 from models import *
