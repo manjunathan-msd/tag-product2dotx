@@ -2,9 +2,10 @@
 import time
 import os
 import json
+import numpy as np
 import pandas as pd
 from transformers import AutoModelForCausalLM, AutoTokenizer, AutoProcessor, pipeline
-from utils.image import download
+from utils.image import *
 
 
 '''
@@ -15,26 +16,26 @@ class Phi3:
         cache_dir = os.path.join('pretrained_models', 'phi3')
         os.makedirs(cache_dir, exist_ok=True)
         # Declare tokenizer, model and model
-        tokenizer = AutoTokenizer.from_pretrained(
+        self.tokenizer = AutoTokenizer.from_pretrained(
             "microsoft/Phi-3-mini-4k-instruct", 
             cache_dir=cache_dir,
             trust_remote_code=True, 
             device_map='cuda'
         )
-        self.tokenizer  = tokenizer
         model = AutoModelForCausalLM.from_pretrained(
             "microsoft/Phi-3-mini-4k-instruct", 
             cache_dir=cache_dir,
             trust_remote_code=True, 
             device_map='cuda',
-            torch_dtype='auto'
+            torch_dtype='auto',
+            attn_implementation='eager'
         )
         self.pipeline = pipeline( 
             "text-generation", 
             model=model, 
-            tokenizer=tokenizer, 
+            tokenizer=self.tokenizer, 
         )
-        # Define generation configurations
+        # Define generation configurations   
         self.generation_args = configs 
         
     def get_context(self, data: dict, cols: list):
@@ -45,10 +46,22 @@ class Phi3:
         return text
     
     def __call__(self, taxonomy_dict: dict, data_dict: dict, metadata_dict: dict):
-        prompt = taxonomy_dict['prompt']
-        note = taxonomy_dict['note']
-        context = self.get_context(data_dict, taxonomy_dict['default_text_cols'])
-        if taxonomy_dict['inference_mode'] == 'attribute' or taxonomy_dict['inference_mode'] == 'presets':
+        if taxonomy_dict['inference_mode'] == 'category':
+            if taxonomy_dict['node_type'] == 'NA':
+                prompt = taxonomy_dict['prompt']
+                note = taxonomy_dict['note']
+                context = self.get_context(data_dict, taxonomy_dict['default_text_cols'])
+                labels = {k: taxonomy_dict[k]['labels'] for k in taxonomy_dict.keys() if isinstance(taxonomy_dict[k], dict)}
+                prompt = prompt.format(metadata=json.dumps(metadata_dict, indent=4), context=context, note=note, labels=json.dumps(labels, indent=4))
+            else:
+                prompt = taxonomy_dict['prompt']
+                context = self.get_context(data_dict, taxonomy_dict['default_text_cols'])
+                labels = taxonomy_dict['labels']
+                prompt = prompt.format(context=context, labels=labels)
+        elif taxonomy_dict['inference_mode'] == 'attribute' or taxonomy_dict['inference_mode'] == 'presets':
+            prompt = taxonomy_dict['prompt']
+            note = taxonomy_dict['note']
+            context = self.get_context(data_dict, taxonomy_dict['default_text_cols'])
             if taxonomy_dict['node_type'] == 'NA':
                 attribute = taxonomy_dict['breadcrumb'].split('>')[-1].strip()
                 labels = taxonomy_dict['labels']
@@ -56,8 +69,6 @@ class Phi3:
             else:
                 labels = taxonomy_dict['labels']
                 prompt = prompt.format(context=context, labels=labels)
-        elif taxonomy_dict['inference_mode'] == 'category':
-            pass
         else:
             raise ValueError("Invalid inference mode!")
         start = time.time()
@@ -104,7 +115,7 @@ class Phi3Vision:
     def get_images(self, data: dict, cols: list):
         images = []
         for col in cols:
-            if not pd.isna(col):
+            if not pd.isna(data[col]):
                 try:
                     image = download(data[col])
                     images.append(image)
@@ -113,32 +124,46 @@ class Phi3Vision:
         return images
     
     def __call__(self, taxonomy_dict: dict, data_dict: dict, metadata_dict: dict):
-        prompt = taxonomy_dict['prompt']
-        note = taxonomy_dict['note']
-        context = self.get_context(data_dict, taxonomy_dict['default_text_cols'])
-        images = self.get_images(data_dict, taxonomy_dict['default_image_cols'])
-        if taxonomy_dict['inference_mode'] == 'attribute' or taxonomy_dict['inference_mode'] == 'presets':
+        if taxonomy_dict['inference_mode'] == 'category':
+            if taxonomy_dict['node_type'] == 'NA':
+                prompt = taxonomy_dict['prompt']
+                note = taxonomy_dict['note']
+                context = self.get_context(data_dict, taxonomy_dict['default_text_cols'])
+                labels = {k: taxonomy_dict[k]['labels'] for k in taxonomy_dict.keys() if isinstance(taxonomy_dict[k], dict)}
+                prompt = prompt.format(metadata=json.dumps(metadata_dict, indent=4), context=context, note=note, labels=json.dumps(labels, indent=4))
+                self.image_cols = taxonomy_dict['default_image_cols']
+            else:
+                prompt = taxonomy_dict['prompt']
+                context = self.get_context(data_dict, taxonomy_dict['default_text_cols'])
+                labels = taxonomy_dict['labels']
+                prompt = prompt.format(context=context, labels=labels)
+                self.image_cols = taxonomy_dict['default_image_cols']
+        elif taxonomy_dict['inference_mode'] == 'attribute' or taxonomy_dict['inference_mode'] == 'presets':
+            prompt = taxonomy_dict['prompt']
+            note = taxonomy_dict['note']
+            context = self.get_context(data_dict, taxonomy_dict['default_text_cols'])
             if taxonomy_dict['node_type'] == 'NA':
                 attribute = taxonomy_dict['breadcrumb'].split('>')[-1].strip()
                 labels = taxonomy_dict['labels']
                 prompt = prompt.format(metadata=json.dumps(metadata_dict, indent=4), context=context, note=note, attribute=attribute, labels=labels)
+                self.image_cols = taxonomy_dict['default_image_cols']
             else:
                 labels = taxonomy_dict['labels']
                 prompt = prompt.format(context=context, labels=labels)
-        elif taxonomy_dict['inference_mode'] == 'category':
-            pass
+                self.image_cols = taxonomy_dict['default_image_cols']
         else:
             raise ValueError("Invalid inference mode!")
         start = time.time()
         # Message template
-        messages = [ 
+        payload = [ 
             {"role": "system", "content": "You are a helpful assistant who is an expert of inventory management."}
-        ] 
-        for i, image in enumerate(images):
-            messages.append({"role": "user", "content": f"<|image_{i+1}|>\nExtract useful information from the image to perform the task described below."})
-        messages.append({"role": "user", "content": prompt})
+        ]
+        images = self.get_images(data_dict, self.image_cols)
+        for i, _ in enumerate(images):
+            payload.append({"role": "user", "content": f"<|image_{i+1}|>\nExtract useful information from the image to perform the task described below."})
+        payload.append({"role": "user", "content": prompt})
         # Prepare inputs
-        prompt = self.processor.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        prompt = self.processor.tokenizer.apply_chat_template(payload, tokenize=False, add_generation_prompt=True)
         inputs = self.processor(prompt, images, return_tensors="pt").to("cuda") 
         generate_ids = self.model.generate(
             **inputs, 

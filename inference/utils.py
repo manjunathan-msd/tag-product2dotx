@@ -20,6 +20,7 @@ class Tagger:
         self.taxonomy = taxonomy
         # Load deafult models and it's configs
         model_name = configs['model']['name']
+        self.model_name = model_name
         if configs['model']['parameters']:
             parameters = configs['model']['parameters']
         if model_name in globals():
@@ -311,10 +312,16 @@ class Tagger:
         # List to store tags
         res = []
         # Process all records
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            futures = [executor.submit(self.process_row, row, self.tag) for row in df.to_dict(orient='records')]
-            for future in tqdm(as_completed(futures), desc='Inferencing', total=df.shape[0]):
-                result = future.result()
+        if self.model_name in ['ChatGPT']:
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                futures = [executor.submit(self.process_row, row, self.tag) for row in df.to_dict(orient='records')]
+                for future in tqdm(as_completed(futures), desc='Inferencing', total=df.shape[0]):
+                    result = future.result()
+                    if result is not None:
+                        res.append(result)
+        else:
+            for row in tqdm(df.to_dict(orient='records'), desc='Inferencing', total=df.shape[0]):
+                result = self.process_row(row, self.tag)
                 if result is not None:
                     res.append(result)
         res = pd.DataFrame(res)

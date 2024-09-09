@@ -1,12 +1,14 @@
 model:
-  name: ChatGPT
+  name: Phi3Vision
   parameters:
-    model_name: gpt-4o-mini
+    max_new_tokens: 64
+    temperature: 0.0
+    do_sample: False
 prompts:
   non_leaf_prompt_path: prompts/non_leaf_classification.txt
   leaf_prompt_path: prompts/leaf_classification_attribute.txt
   note: prompts/note.txt
 inference:
   level: presets                  # level can be 'attribute', 'category' and 'presets'
-  text_cols: Product Name,ocr_txt
-  image_cols: Image URL (F),Image URL (L),Image URL (R),Image URL (B)
+  text_cols: categories,color,description,dimension,marketing_cat,materials_and_finish,price,sale_price,short_description
+  image_cols: image_link
