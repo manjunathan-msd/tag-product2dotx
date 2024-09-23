@@ -4,9 +4,9 @@ model:
     model_name: gpt-4o-mini
 prompts:
   non_leaf_prompt_path: prompts/non_leaf_classification.txt
-  leaf_prompt_path: prompts/azadea/default_prompt_leaf.txt
+  leaf_prompt_path: prompts/leaf_classification_attribute.txt
   note: prompts/note.txt
 inference:
   level: presets                  # level can be 'attribute', 'category' and 'presets'
-  text_cols: name
-  image_cols: image_link
+  text_cols: ocr_txt, Product Name
+  image_cols: Image URL (F), Image URL (R), Image URL (L), Image URL (B)

@@ -8,5 +8,5 @@ Single Value / Multi Value:
 
 Input Priority:
     Image: Image should be priotized more rather than text to get the prediction.
-    Text: Text shoudl be priotized more rather than image to get the prediction.
+    Text: Text should be priotized more rather than image to get the prediction.
     Image, Text: Image and Text both should be priotized equally to get the prediction.
