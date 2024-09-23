@@ -1,0 +1,6 @@
+openai==1.39.0
+python-dotenv
+cachetools
+random_user_agent
+fuzzywuzzy
+python-Levenshtein

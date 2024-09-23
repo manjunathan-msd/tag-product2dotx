@@ -1,42 +1,57 @@
 # Import libraries
 import time
 import requests
+import cachetools
 from models.chatgpt import ChatGPT
-
+# Declare a cache for the encoding
+fashion_cache = cachetools.LRUCache(maxsize=10)
 
 '''
 The class can hit the current fashion models of MSD and get tags from that.
 '''
 class FashionAPI:
-    def __init__(self, url: str, headers: dict, catalog_id: str, graph_id: str, feed_id: str):
-        self.url = url
-        self.headers = headers
-        self.catalog_id = catalog_id
-        self.graph_id = graph_id
-        self.feed_id = feed_id
-
-    def __call__(self, prompt: str, image_url: str = None):
-        start = time.time()
-        payload = {
-            "catalog_id": self.catalog_id,
-            "graph_id": self.graph_id,
-            "feed_id": self.feed_id,
+    def __init__(self, **configs):
+        pass
+    
+    @cachetools.cached(fashion_cache)
+    def inference(self, image_url: str):
+        url = "https://use1.vue.ai/api/v1/inference?is_sync=true&is_skip_cache=true"
+        headers = {
+            "x-api-key": "737aaa23439a4e029ec2373da750792f",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "catalog_id": "0433f9caa0",
+            "feed_id": "cyborg",
             "input": {
-                'image_url': image_url,
-                'title_english': '',
-                'product_id': 'demosite_cyborg_hit'
+                "image_url": [image_url],
+                "product_id": "demosite_cyborg_hit_1"
             }
         }
-        response = requests.post(self.url, headers=self.headers, json=payload)
-        response = response.json()
+        response = requests.post(url, headers=headers, json=data).json()
+        tags = response['data']['msd_tags']
         res = {}
-        for attr in response['data']['msd_tags'][0]['attributes']:
-            res[attr['name']] = attr['results'][0]['value']
+        for attr in tags[0]['attributes']:
+            res[attr['name']] = ','.join([x['value'] for x in attr['results']])
+        return res
+
+    def __call__(self, taxonomy_dict: dict, data_dict: dict, metadata_dict: dict):
+        start = time.time()
+        if taxonomy_dict['inference_mode'] == 'category':
+            raise ValueError("Infernce mode can't be catgeory!")
+        elif taxonomy_dict['inference_mode'] == 'attribute' or taxonomy_dict['inference_mode'] == 'presets':
+            image_col = taxonomy_dict['default_image_cols'][0]
+            image_url = data_dict[image_col]
+            response = self.inference(image_url)
+            attribute = taxonomy_dict['breadcrumb'].split('>')[-1].strip()
+            if attribute in response.keys():
+                res = response[attribute]
+            else:
+                res = 'Not specified'
+        else:
+            raise ValueError("Wrong inference mode!")
         end = time.time()
-        resp = ''
-        for x, y in res.items():
-            resp += f'{x}: {y}\n'
-        return res, 'NA', 'NA', end - start
+        return res, 0, 0, end - start
 
 
 

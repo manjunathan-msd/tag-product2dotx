@@ -6,8 +6,8 @@ import json
 import pandas as pd
 from tqdm import tqdm
 from taxonomy_builder.utils import TaxonomyTree
-from utils.string import *
-from utils.misc import *
+from utils.string_utils import *
+from utils.misc_utils import *
 from models import *
 
 
@@ -167,11 +167,14 @@ class Tagger:
                                 label = []
                                 for l in resp.split(','):
                                     label.append(get_most_similar(attr.get('labels'), l))
-                                label = [x for x in label if x != 'Not specified']
+                                label = list(set([x for x in label if x != 'Not specified']))
                                 if len(label) == 0:
                                     label = 'Not specified'
                                 else:
-                                    label = ', '.join(label)
+                                    if attr.get('Single Value / Multi Value') == 'Single Value':
+                                        label = label[0]
+                                    else:
+                                        label = ', '.join(label)
                             else:
                                 if resp.lower().strip() == 'not specified':
                                     resp = 'Not specified'
@@ -264,11 +267,14 @@ class Tagger:
                                 label = []
                                 for l in resp.split(','):
                                     label.append(get_most_similar(attr.get('labels'), l))
-                                label = [x for x in label if x != 'Not specified']
+                                label = list(set([x for x in label if x != 'Not specified']))
                                 if len(label) == 0:
                                     label = 'Not specified'
                                 else:
-                                    label = ', '.join(label)
+                                    if attr.get('Single Value / Multi Value') == 'Single Value':
+                                        label = label[0]
+                                    else:
+                                        label = ', '.join(label)
                             else:
                                 if resp.lower().strip() == 'not specified':
                                     resp = 'Not specified'

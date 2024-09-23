@@ -6,7 +6,7 @@ load_dotenv()
 import json
 import pandas as pd
 from openai import OpenAI
-from utils.image import encode_image
+from utils.image_utils import encode_image
 
 
 
@@ -51,6 +51,7 @@ class ChatGPT:
     def __init__(self, **configs):
         # Get model name of ChatGPT
         self.model_name = configs['model_name']
+        self.text_only = False
         if 'text_cols' in configs:
             self.text_cols = [x.strip() for x in configs['text_cols'].split(',')]
         else:
@@ -59,6 +60,8 @@ class ChatGPT:
             self.image_cols = [x.strip() for x in configs['image_cols'].split(',')]
         else:
             self.image_cols = None
+        if 'text_only' in configs.keys():
+            self.text_only = bool(configs['text_only'])
         self.client = OpenAI()
     
     def get_context(self, data: dict, cols: list):
@@ -76,7 +79,7 @@ class ChatGPT:
                     image = encode_image(data[col])
                     images.append(image)
                 except Exception as err:
-                    pass
+                    print(err)
         return images
         
     def __call__(self, taxonomy_dict: dict, data_dict: dict, metadata_dict: dict):
@@ -112,7 +115,7 @@ class ChatGPT:
         start = time.time()
         payload = []
         # images = self.get_images(data_dict, taxonomy_dict['default_image_cols'])
-        if self.model_name in ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']:
+        if not self.text_only and self.model_name in ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']:
             images = self.get_images(data_dict, self.image_cols)
             for image in images:
                 payload.append(
@@ -124,6 +127,7 @@ class ChatGPT:
                         }
                     }
                 )
+
                 payload.append(
                     {
                         "type": "text",

@@ -7,8 +7,8 @@ from cachetools import cached
 import re
 import json
 import pandas as pd
-from utils.string import tokenize, stem_words
-from utils.image import encode_image
+from utils.string_utils import tokenize, stem_words
+from utils.image_utils import encode_image
 from openai import OpenAI
 
 

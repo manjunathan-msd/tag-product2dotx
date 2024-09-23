@@ -124,3 +124,6 @@ demo_scripts
 temp.py
 demo.py
 *.out
+
+# Unnecessary Prompt
+prompts/azadea
