@@ -8,5 +8,5 @@ prompts:
   note: prompts/note.txt
 inference:
   level: presets                  # level can be 'attribute', 'category' and 'presets'
-  text_cols: ocr_txt, Product Name
-  image_cols: Image URL (F), Image URL (R), Image URL (L), Image URL (B)
+  text_cols: display_name,productFitCare,Family
+  image_cols: primary_image_url
