@@ -334,7 +334,6 @@ class KeywordLookupMeetsChatGPT:
 
         # if KeywordLookup result is empty
         else:
-            print("Empty res from KWLookup, using GPT")
             context = self.get_context(data_dict, self.prompt_text_cols)
             images = self.get_images(data_dict, self.prompt_image_cols)
             payload = []
