@@ -274,6 +274,7 @@ class KeywordLookupMeetsChatGPT:
     def __init__(self, **configs):
         try:
             self.client = OpenAI()
+            self.lookup_table = configs['lookup_table']
             if 'text_cols' in configs:
                 self.text_cols = configs['text_cols'].split(",")
             else:
@@ -316,15 +317,14 @@ class KeywordLookupMeetsChatGPT:
             self.text_cols = taxonomy_dict['default_text_cols']
         context = self.get_context(data_dict, self.text_cols)
         context = context.lower()
-        # List to store result
         res = []
         # Check for match 
-        for x in taxonomy_dict['labels']:
-            pattern = r'\b' + re.escape(x.lower().strip()) + r'\b'
-            if re.search(pattern, context):
-                res.append(x.strip())
-        end = time.time()
-
+        for k, vals in self.lookup_table.items():
+            for v in vals:
+                pattern = r'\b' + re.escape(v.lower().strip()) + r'\b'
+                if re.search(pattern, context):
+                    res.append(k)
+        end = time.time()  
         if res != []:
             # Return the result depending on the metadata
             if 'Single' in metadata_dict['Single Value / Multi Value']:

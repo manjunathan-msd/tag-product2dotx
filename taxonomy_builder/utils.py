@@ -2,7 +2,8 @@
 import re
 import numpy as np
 import pandas as pd
-        
+# from taxonomy_builder.utils import TaxonomyTree
+
 # Node of the taxonomy tree
 class TaxonomyNode:
     # Constructor
